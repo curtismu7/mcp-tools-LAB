@@ -20,30 +20,51 @@ const CLI = fileURLToPath(new URL('../src/scanner/cli.js', import.meta.url));
 const present = fs.existsSync(path.join(SRC, '.git'));
 
 const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
-async function waitFor(url, ms = 20_000) {
-  const end = Date.now() + ms;
-  for (;;) {
-    try { if ((await fetch(url)).ok) return; } catch { /* not up yet */ }
-    if (Date.now() > end) throw new Error(`${url} did not come up`);
-    await new Promise((r) => setTimeout(r, 150));
+
+// hostile-mcp cannot bind port 0 (PORT=0 falls back to its default 4701), so a free port is probed first and the pick
+// can lose a race to another process. Each attempt therefore (a) watches the child, so an early exit (EADDRINUSE, a
+// failed preflight) fails at once with its output instead of a silent wait, (b) accepts only a demo-health/1 answer
+// naming hostile-mcp, so a stranger on that port is not mistaken for the server, and (c) polls with a per-request
+// timeout inside a bounded deadline sized for a loaded machine. A lost port race is retried on a new port.
+async function startHostileServer(clone, { attempts = 3, readyMs = 60_000 } = {}) {
+  const failures = [];
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const port = await freePort();
+    const env = { ...process.env, PORT: String(port) };
+    delete env.HOSTILE_BIND;
+    const child = spawn(process.execPath, ['server/src/index.js'], { cwd: clone, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    let exited = null;
+    for (const stream of [child.stdout, child.stderr]) stream.on('data', (c) => { output = (output + c).slice(-2000); });
+    child.once('exit', (code, signal) => { exited = `code ${code} signal ${signal}`; });
+    const end = Date.now() + readyMs;
+    let why = '';
+    while (!exited && Date.now() < end) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(2_000) });
+        const body = await res.json();
+        if (body.schema === 'demo-health/1' && body.demo?.id === 'hostile-mcp') return { port, child };
+        why = `unexpected health answer from port ${port}: HTTP ${res.status}`;
+      } catch (e) { why = `health not answering yet (${e.name})`; }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    child.kill();
+    failures.push(`attempt ${attempt} on port ${port}: ${exited ? `hostile-mcp exited (${exited})` : `no demo-health/1 answer within ${readyMs} ms (${why})`}; output: ${output.trim() || '(none)'}`);
   }
+  throw new Error(`hostile-mcp did not start from ${clone}\n${failures.join('\n')}`);
 }
 
 test(`${present ? '' : `SKIPPED: set HOSTILE_MCP_SRC (no hostile-mcp checkout at ${SRC}) - `}live scan of the real hostile server: poisoned tools flagged, benign ones not, the rug-pull shows on the second list`,
   { skip: present ? false : 'SKIPPED: set HOSTILE_MCP_SRC to a hostile-mcp checkout to run the live test', timeout: 300_000 }, async () => {
     const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-tools-hostile-'));
     const clone = path.join(work, 'hostile-mcp');
-    let server; let app;
+    let server; let app; let port;
     try {
       execFileSync('git', ['clone', '--quiet', SRC, clone], { stdio: 'pipe' });
       execFileSync('npm', ['ci', '--no-audit', '--no-fund', '--ignore-scripts'], { cwd: clone, stdio: 'pipe' });
       assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: clone }).toString(), '', 'the clone is clean before the run');
 
-      const port = await freePort();
-      const env = { ...process.env, PORT: String(port) };
-      delete env.HOSTILE_BIND;
-      server = spawn(process.execPath, ['server/src/index.js'], { cwd: clone, env, stdio: 'ignore' });
-      await waitFor(`http://127.0.0.1:${port}/api/health`);
+      ({ port, child: server } = await startHostileServer(clone));
       const url = `http://127.0.0.1:${port}/mcp`;
 
       app = await startApp();
