@@ -13,13 +13,13 @@ Press Scan on a connected server, read the findings with their evidence, and onl
 
 ## Status
 
-Built and tested. Last run: 72 server tests and 40 web tests pass and `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
+Built and tested. On a clean clone with nothing else checked out, `npm test` runs 79 always-on server tests (all pass) and 42 web tests, plus 1 optional server test that is reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`); with a `hostile-mcp` checkout that one runs too, 80 of 80. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
 
 
 
 - Server: Streamable HTTP and stdio MCP clients, tools, resources, prompts and the other protocol methods, saved connections, the confirm-gated `tools/call`, the scanner library and CLI, `GET /api/health` (`demo-health/1`), doctor.
 - Scanner: 19 rules with stable ids and fixed severities (info, warn, high), evidence spans, invisible/bidi/tag/homoglyph detection with the characters made visible, name-shadowing against a trusted-names list, size/depth/count budgets that end in a "scan truncated" finding, and a machine-readable `scan-report/1` ([schema](docs/scan-report.schema.json)).
-- An integration test that clones the real [hostile-mcp](../hostile-mcp) server from a clean copy, runs it on a free loopback port and scans it: its poisoned tools are flagged, its benign ones are not, and the rug-pull shows up on the second list.
+- An always-on test that scans a committed snapshot of what the real [hostile-mcp](https://github.com/cmuir_pingcorp/hostile-mcp) server serves (`server/test/fixtures/hostile-snapshot.json`, captured by `node scripts/capture-hostile-snapshot.mjs`, source commit recorded inside it): its poisoned tools, resource and prompt are flagged, its benign tools are not, and the rug-pull shows up on the second list. If a local checkout is newer than the snapshot the test only warns. The same assertions also run as an optional live test that clones the real server (below).
 - Web UI: Connect page (saved connections, HTTP or stdio, test, write-only token), Server page (Tools / Resources / Prompts, scan-before-first-use banner, list-changed signal, Scan, verdict, findings by severity with evidence, "what this scan cannot catch"), a call panel with a schema form and a confirm dialog, offline snapshot scan with report download, two stories (generic, airlines and banking packs) with a presenter mode, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), a limits page, light and dark themes. Untrusted strings render as inert text only.
 
 Not verified:
@@ -29,7 +29,7 @@ Not verified:
 - The stdio transport was tested against a small fixture server, not against third-party MCP servers.
 - The Docker image and compose file were built and run on OrbStack and checked by content (health, page, a pasted snapshot scan, the confirm gate, non-root); that is a manual check, not CI. CI only greps the compose file for the loopback-only port.
 - The e2e script needs a hostile-mcp checkout, git, npm and a Playwright Chromium; it is documented, not run by CI.
-- The hostile-server integration test is skipped when a `hostile-mcp` checkout is not next to this repo (`HOSTILE_MCP_SRC`), so CI without it does not run it.
+- The optional live hostile-server test (`hostile.integration.test.js`) is skipped, with `SKIPPED: set HOSTILE_MCP_SRC` in its title, when no `hostile-mcp` checkout is next to this repo, so CI does not run it. The criterion itself does not depend on it: the committed-snapshot test above always runs. The snapshot can go stale; it is not refreshed automatically.
 
 ## Run it
 
@@ -88,7 +88,7 @@ The image runs as a non-root user. Inside the container the server listens on al
 
 ## SE shelf, Learning Hub, browser run
 
-- Shelf: merge `docs/shelf-entry.json` (D3 and D4, one app) into the shelf's `.data/demos.local.json`; it shows Ready from `/api/health`.
+- Shelf: merge `docs/shelf-entry.json` (D3 and D4, one app) into the shelf's `.data/demos.local.json`; it shows Ready from `/api/health`. **Override `composeFile` first:** the committed value is the author's absolute path (`/Users/cmuir/Development/mcp-tools/docker-compose.yml`); replace it, in both entries, with the absolute path of `docker-compose.yml` in your checkout, or the shelf cannot start the stack.
 - Learning Hub: `content-pack.json`, regenerate and validate with `npm run content-pack`.
 - Browser run: `npm run build && npm run e2e` (needs a `hostile-mcp` checkout next to this repo; see [docs/packaging.md](docs/packaging.md)).
 
