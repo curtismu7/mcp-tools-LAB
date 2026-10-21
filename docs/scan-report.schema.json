@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "scan-report/1",
+  "title": "scan-report/1",
+  "description": "The machine-readable result of one metadata scan. The scanner reports; enforcement is always 'none'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "scannedAt", "scanner", "source", "input", "summary", "findings", "rules", "limits"],
+  "properties": {
+    "schema": { "const": "scan-report/1" },
+    "scannedAt": { "type": "string" },
+    "scanner": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version", "enforcement"],
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" }, "enforcement": { "const": "none" } }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": { "type": { "enum": ["url", "file", "snapshot", "connection", "agent-card"] }, "label": { "type": "string" } }
+    },
+    "input": {
+      "type": "object", "additionalProperties": false, "required": ["tools", "resources", "prompts", "card", "trustedNames", "truncated"],
+      "properties": {
+        "tools": { "type": "integer" }, "resources": { "type": "integer" }, "prompts": { "type": "integer" },
+        "card": { "type": "boolean" }, "trustedNames": { "type": "integer" }, "truncated": { "type": "boolean" }
+      }
+    },
+    "summary": {
+      "type": "object", "additionalProperties": false, "required": ["info", "warn", "high", "total"],
+      "properties": { "info": { "type": "integer" }, "warn": { "type": "integer" }, "high": { "type": "integer" }, "total": { "type": "integer" } }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["ruleId", "severity", "kind", "subject", "detail", "evidence"],
+        "properties": {
+          "ruleId": { "type": "string", "pattern": "^MT-[A-Z]{2}-[0-9]{3}$" },
+          "severity": { "enum": ["info", "warn", "high"] },
+          "kind": { "type": "string" },
+          "subject": { "type": "string" },
+          "arg": { "type": "string" },
+          "detail": { "type": "string" },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object", "additionalProperties": false, "required": ["field", "start", "end", "excerpt"],
+              "properties": {
+                "field": { "type": "string", "description": "Path of the string inside the item, e.g. inputSchema.properties.cb.default" },
+                "start": { "type": "integer", "minimum": 0, "description": "UTF-16 code-unit offset into the original string" },
+                "end": { "type": "integer", "minimum": 0 },
+                "excerpt": { "type": "string", "description": "Plain text; invisible characters shown as [U+XXXX]. Never HTML." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "severity", "kind", "title"],
+        "properties": { "id": { "type": "string" }, "severity": { "enum": ["info", "warn", "high"] }, "kind": { "type": "string" }, "title": { "type": "string" } }
+      }
+    },
+    "limits": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": false, "required": ["id", "text"], "properties": { "id": { "type": "string" }, "text": { "type": "string" } } }
+    },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

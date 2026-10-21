@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    # Set the repository variable RUNS_ON (JSON, e.g. ["ubuntu-latest"]) to change the runner.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
+    strategy:
+      matrix:
+        # PRs test the newest Node only; main tests both supported versions.
+        node: ${{ github.event_name == 'pull_request' && fromJSON('[22]') || fromJSON('[20, 22]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+  secrets:
+    # Fails the PR if any commit in its history contains a secret.
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: PATH="/opt/homebrew/bin:$PATH" gitleaks detect --source . --redact -v

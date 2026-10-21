@@ -1,0 +1,27 @@
+{
+  "name": "mcp-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP tools: connect to an MCP server, list its tools, scan the metadata before an agent ingests it, then call tools with an explicit confirm step.",
+  "license": "MIT",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w server & npm run dev -w web",
+    "start": "npm start -w server",
+    "test": "npm test -w server && npm test -w web",
+    "build": "npm run build -w web",
+    "scan": "node server/src/scanner/cli.js",
+    "doctor": "node scripts/doctor.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}
