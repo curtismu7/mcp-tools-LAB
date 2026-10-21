@@ -1,0 +1,7 @@
+{
+  "note": "Byte-exact copies of files from sibling repos, committed so packaging.test.js runs on any machine. Refresh by copying the file again and updating the commit and sha256.",
+  "files": {
+    "id-jag-content-pack.schema.json": { "repo": "https://github.com/cmuir_pingcorp/id-jag-standalone", "path": "docs/content-pack.schema.json", "commit": "37a56c1ad34d4d7fc4977aa402ae9e5512b9bef5", "sha256": "cb7e7485c75bcce2f3c14e9e18532dac1947849e36c2ad7ae425c4169bf29b43" },
+    "mcp-inspector-README.md": { "repo": "https://github.com/curtismu7/AI-DEMO2", "path": "standalone/mcp-inspector/README.md", "commit": "9bc9c77f9ed4f681490f590af2093179f6ab5a21", "sha256": "46c4e5a05a51afcf9676764accce2ef797e72a07ac4916984515a61c7c9af17a" }
+  }
+}

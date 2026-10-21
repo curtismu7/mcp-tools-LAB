@@ -1,6 +1,7 @@
 // Docker, shelf entry, content pack and generated docs. Patterns from hostile-mcp scripts/compose.test.mjs and
 // content-pack.test.mjs (same author).
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,13 @@ import { PACK_PATH, buildPack, serialize } from '../../scripts/build-content-pac
 import { DOC_PATH, buildScanRules } from '../../scripts/build-scan-rules.mjs';
 import { validatePack } from '../../scripts/validate-content-pack.mjs';
 import { RULES } from '../src/scanner/rules.js';
+
+// Committed copies of the two sibling-repo files this test compares against (see PROVENANCE.json for repo + commit).
+// They make the checks run on any machine; the live sibling checkouts, when present, are an extra comparison.
+const COPIES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'source-copies');
+const copy = (name) => fs.readFileSync(path.join(COPIES, name), 'utf8');
+const provenance = JSON.parse(copy('PROVENANCE.json')).files;
+const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -57,7 +65,7 @@ test('docs/shelf-entry.json holds valid shelf registry entries for D3 and D4 on 
     assert.match(d.id, /^[a-z0-9-]{2,41}$/);
     assert.equal(d.url, 'http://localhost:4810');
     assert.equal(d.healthPath, '/api/health');
-    assert.ok(d.composeFile.startsWith('/') && d.composeFile.endsWith('docker-compose.yml'));
+    assert.ok(d.composeFile.startsWith('/') && d.composeFile.endsWith('docker-compose.yml'), 'composeFile is an absolute path (the shipped value is the author\'s; README says how to override it)');
     assert.ok(d.name.length <= 300 && d.description.length <= 300);
   }
 });
@@ -68,8 +76,11 @@ test('content-pack.json is exactly what the generator produces (run: node script
 
 test('content-pack.json validates against the schema, and the schema is the ID-JAG kit\'s', () => {
   assert.deepEqual(validatePack(JSON.parse(fs.readFileSync(PACK_PATH, 'utf8'))), []);
-  const kit = '/Users/cmuir/Development/id-jag-standalone/docs/content-pack.schema.json';
-  if (fs.existsSync(kit)) assert.equal(read('docs/content-pack.schema.json'), fs.readFileSync(kit, 'utf8'));
+  const name = 'id-jag-content-pack.schema.json';
+  assert.equal(sha(copy(name)), provenance[name].sha256, 'the committed kit schema copy matches its recorded sha256');
+  assert.equal(read('docs/content-pack.schema.json'), copy(name), `docs/content-pack.schema.json is not byte-identical to the kit's schema at ${provenance[name].commit.slice(0, 9)}`);
+  const kit = process.env.IDJAG_KIT_SRC || path.join(ROOT, '..', 'id-jag-standalone', 'docs', 'content-pack.schema.json');
+  if (fs.existsSync(kit)) assert.equal(read('docs/content-pack.schema.json'), fs.readFileSync(kit, 'utf8'), 'also identical to the sibling checkout');
 });
 
 test('the validator rejects a broken pack', () => {
@@ -84,8 +95,9 @@ test('the pack has the required terms, two story cards, and only the one source 
   for (const id of ['tool-metadata', 'tool-poisoning', 'hidden-instruction', 'exfil-sink', 'name-shadowing', 'bidi-zero-width', 'scan-report', 'trust-on-first-use', 'confirm-gate', 'inspector']) assert.ok(pack.glossary.some((g) => g.id === id), id);
   assert.deepEqual(pack.cards.filter((c) => c.story).map((c) => c.story).sort(), ['S01', 'S02']);
   assert.deepEqual(pack.sources.map((s) => s.url), ['https://modelcontextprotocol.io']);
-  const inspectorReadme = '/Users/cmuir/Development/AI-DEMO2/standalone/mcp-inspector/README.md';
-  if (fs.existsSync(inspectorReadme)) assert.ok(fs.readFileSync(inspectorReadme, 'utf8').includes('https://modelcontextprotocol.io'));
+  const name = 'mcp-inspector-README.md';
+  assert.equal(sha(copy(name)), provenance[name].sha256, 'the committed README copy matches its recorded sha256');
+  assert.ok(copy(name).includes(pack.sources[0].url), `the source URL appears in the inspector README at ${provenance[name].commit.slice(0, 9)}`);
   assert.equal(JSON.stringify(pack).match(/pingone\.(com|eu|asia|ca)|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g), null);
 });
 
