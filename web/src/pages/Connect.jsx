@@ -8,6 +8,30 @@ function parseEnv(text) {
   return Object.fromEntries(text.split("\n").map((l) => l.trim()).filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1)]));
 }
 
+// Hosted mock: the server accepts only its two built-in sample servers, so there is no URL, token or command to type.
+function MockPicker({ onCreated, onGo }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  async function pick(fixture) {
+    setBusy(true);
+    const r = await post("/api/connections", { transport: "mock", fixture });
+    setBusy(false);
+    if (!r.ok) { setMsg(r.data?.message || "Could not connect."); return; }
+    setMsg(null);
+    onCreated(r.data.connection);
+    onGo(r.data.connection);
+  }
+  return (
+    <section className="card" aria-labelledby="mock-h">
+      <h3 id="mock-h">Built-in sample servers</h3>
+      <p className="small muted">Custom URLs, tokens and stdio commands are disabled in the hosted mock.</p>
+      <button type="button" className="btn primary" disabled={busy} onClick={() => pick("sample")}>Open the clean sample server</button>{" "}
+      <button type="button" className="btn" disabled={busy} onClick={() => pick("hostile")}>Open the hostile sample server</button>
+      {msg && <p className="alert" role="status">{msg}</p>}
+    </section>
+  );
+}
+
 function ConnectForm({ config, onCreated, onGo }) {
   const [f, setF] = useState(blankForm);
   const [msg, setMsg] = useState(null);
@@ -112,7 +136,9 @@ export default function Connect({ config, activeId, onOpen, onRemoved }) {
           </ul>
         )}
       </div>
-      <ConnectForm config={config} onCreated={(c) => { load(); onOpen(c, false); }} onGo={(c) => onOpen(c, true)} />
+      {config?.mockOnly
+        ? <MockPicker onCreated={(c) => { load(); onOpen(c, false); }} onGo={(c) => onOpen(c, true)} />
+        : <ConnectForm config={config} onCreated={(c) => { load(); onOpen(c, false); }} onGo={(c) => onOpen(c, true)} />}
     </>
   );
 }

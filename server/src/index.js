@@ -2,10 +2,11 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { port as configPort } from './config.js';
 import { allPassed, runChecks } from './doctor.js';
+import { mockOnly } from './mock.js';
 import { assertBindAllowed, bindHost } from './security.js';
 
 // Local runs read the repo-root .env (real env vars win).
-try { process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url))); } catch { /* no .env */ }
+if (!mockOnly()) { try { process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url))); } catch { /* no .env */ } } // mock-only reads no host files
 
 // Boot on `port` (0 = ephemeral). Refuses a non-loopback host unless MCPTOOLS_BIND is set.
 export function startHttpServer({ port = configPort(), host = bindHost(), app = createApp() } = {}) {
