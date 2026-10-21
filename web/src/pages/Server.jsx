@@ -8,6 +8,8 @@ import ScanResult, { SeverityBadge, downloadReport, worst } from "../components/
 // One connected server: Tools / Resources / Prompts, the Scan button, the scan result, then the call panel. The scan
 // result lives in App (scans[id]) so it survives moving between pages in this session.
 const sigOf = (t) => JSON.stringify([t?.description ?? "", t?.inputSchema ?? null]);
+// One value for a whole tool list, so "the list the scan covered" can be compared with "the list shown now".
+const listKey = (list) => JSON.stringify((list || []).map((t) => [t?.name, sigOf(t)]).sort());
 const TABS = [["tools", "Tools"], ["resources", "Resources"], ["prompts", "Prompts"]];
 
 // The text at an evidence path such as "inputSchema.properties.url.default" inside one listed tool.
@@ -78,7 +80,8 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
   const bySubject = useCallback((name) => findings.filter((f) => f.subject === name), [findings]);
   const resolve = useCallback((f, e) => { const t = (tools || []).find((x) => x.name === f.subject); return t ? fieldText(t, e.field) : null; }, [tools]);
   const flaggedBy = useCallback((name) => worst(bySubject(name)), [bySubject]);
-  const stale = useMemo(() => changed.length > 0 && report, [changed, report]);
+  // Is the scan of the list that is shown now? "none" = never scanned, "older" = the list changed since the scan.
+  const scanCover = useMemo(() => (!report ? "none" : !tools || listKey(report ? scan.listed.tools : []) === listKey(tools) ? "current" : "older"), [report, scan, tools]);
 
   if (!conn) return (<><h2>Server</h2><p className="notice">No server is connected. Go to Connect, choose a saved connection and press Open.</p></>);
 
@@ -87,9 +90,12 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
       <h2>Server: <Untrusted text={conn.label} /></h2>
       <p className="lede">{conn.transport === "http" ? <Untrusted text={conn.url} /> : conn.transport}{conn.token === "set" ? " · token set" : ""}</p>
       {!scan && <p className="notice" data-testid="scan-banner"><strong>Scan before first use.</strong> This connection has not been scanned. What is listed below is what an agent would be given as trusted context. Press Scan before you call anything.</p>}
-      {changed.length > 0 && (
+      {(changed.length > 0 || scanCover === "older") && (
         <p className="alert" role="alert" data-testid="changed">
-          The tool list changed since the one you last saw: <Untrusted text={changed.join(", ")} />. {stale ? "Your scan is of the older list. Scan again." : "Scan before you trust it."}
+          {changed.length > 0 && <>The tool list changed since the one you last saw: <Untrusted text={changed.join(", ")} />. </>}
+          {scanCover === "none" && "Scan before you trust it."}
+          {scanCover === "older" && "The list changed since your last scan, so that scan does not cover it. Scan again."}
+          {scanCover === "current" && "Your last scan covers this changed list. Read its findings."}
         </p>
       )}
 

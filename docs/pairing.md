@@ -9,7 +9,7 @@
 
 ## With the Hostile MCP demo: scanning and pinning
 
-Run the Hostile MCP server on a free port, connect to its `/mcp` address, press Scan: the poisoned tools (instruction tag, secrecy, off-box defaults, shadowing, credential harvest, the poisoned resource and prompt) are flagged with evidence and the clean ones are not. The integration test `server/test/hostile.integration.test.js` and the e2e run do this against a clean copy of the real server.
+Run the Hostile MCP server on a free port, connect to its `/mcp` address, press Scan: the poisoned tools (instruction tag, secrecy, off-box defaults, shadowing, credential harvest, the poisoned resource and prompt) are flagged with evidence and the clean ones are not. The always-on test `server/test/hostile.fixture.test.js` does this against a committed snapshot of the real server, and the optional `hostile.integration.test.js` and the e2e run do it against a clean copy of the live one.
 
 The two demos catch different things:
 
