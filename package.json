@@ -19,9 +19,13 @@
     "build": "npm run build -w web",
     "scan": "node server/src/scanner/cli.js",
     "doctor": "node scripts/doctor.mjs",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "e2e": "node scripts/e2e.mjs",
+    "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs",
+    "docs": "node scripts/build-scan-rules.mjs"
   },
   "devDependencies": {
-    "ajv": "^8.20.0"
+    "ajv": "^8.20.0",
+    "playwright": "^1.58.2"
   }
 }

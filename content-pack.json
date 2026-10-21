@@ -1,0 +1,230 @@
+{
+  "schema": "demo-content-pack/1",
+  "id": "mcp-tools",
+  "title": "MCP tools: inspector and scanner",
+  "version": "0.1.0",
+  "demo": {
+    "id": "mcp-tools",
+    "name": "MCP tools",
+    "catalog": "D3",
+    "baseUrl": "http://localhost:4810",
+    "doctor": "/api/health",
+    "tags": [
+      "mcp",
+      "inspector",
+      "scanner",
+      "tool-poisoning"
+    ]
+  },
+  "glossary": [
+    {
+      "id": "bidi-zero-width",
+      "term": "Bidi and zero-width characters",
+      "definition": "Characters that take no space or change the order text is drawn in (bidirectional controls, zero-width spaces, Unicode tag characters). They let a description show one thing to a person and say another to a model. The scanner reports them with each character shown as [U+XXXX].",
+      "aliases": [
+        "invisible characters",
+        "bidirectional control characters",
+        "zero-width characters"
+      ]
+    },
+    {
+      "id": "confirm-gate",
+      "term": "Confirm gate",
+      "definition": "The step before a tool call is sent: the tool shows the exact arguments and a hash of them, and refuses the call without an explicit confirm that carries that hash. It guards against a click you did not mean and against changed arguments.",
+      "aliases": [
+        "confirm step"
+      ]
+    },
+    {
+      "id": "exfil-sink",
+      "term": "Exfil sink",
+      "definition": "A tool parameter whose default points off-box (a callback URL or an email address). An agent that fills arguments from the schema sends data there on every call.",
+      "aliases": [
+        "exfiltration sink"
+      ]
+    },
+    {
+      "id": "hidden-instruction",
+      "term": "Hidden instruction",
+      "definition": "Text in tool metadata written for the model rather than the person: an instruction tag, an order to keep something from the user, or an imperative aimed at the agent.",
+      "aliases": [
+        "instruction smuggling"
+      ]
+    },
+    {
+      "id": "inspector",
+      "term": "Inspector",
+      "definition": "The part of this tool that connects to an MCP server and shows what it offers (tools, resources, prompts) as plain text, and can call a tool after a confirm step. It sees; it does not judge."
+    },
+    {
+      "id": "name-shadowing",
+      "term": "Name shadowing",
+      "definition": "A tool whose name equals, or looks like, a tool you already trust from another server, so an agent that resolves tools by name may pick the wrong one.",
+      "aliases": [
+        "tool shadowing"
+      ]
+    },
+    {
+      "id": "scan-report",
+      "term": "Scan report",
+      "definition": "The machine-readable result of a scan (scan-report/1): the findings with rule id, severity and evidence, the input counts, the rule table and the list of what a metadata scan cannot catch. It records enforcement as none."
+    },
+    {
+      "id": "tool-metadata",
+      "term": "Tool metadata",
+      "definition": "What a server says about its tools: names, descriptions and input schemas. An agent reads it as trusted context before it ever calls a tool."
+    },
+    {
+      "id": "tool-poisoning",
+      "term": "Tool poisoning",
+      "definition": "Putting instructions or traps in tool metadata. The model reads that text as trusted context and the person normally never sees it.",
+      "aliases": [
+        "tool description injection"
+      ]
+    },
+    {
+      "id": "trust-on-first-use",
+      "term": "Trust on first use",
+      "definition": "Accepting whatever a server presents the first time and noticing only later changes. It is safe only if the first presentation was vetted. A scan before first use is that vetting; a scan is one list at one moment.",
+      "aliases": [
+        "TOFU"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "mcp-home",
+      "title": "Model Context Protocol",
+      "url": "https://modelcontextprotocol.io",
+      "kind": "website",
+      "use": "Named as the MCP home page in the inspector README this repo was copied from. Not quoted here.",
+      "status": "not-read",
+      "checked": "2026-10-21"
+    }
+  ],
+  "cards": [
+    {
+      "id": "connect",
+      "label": "Connect to a server",
+      "description": "Add an MCP server over HTTP or stdio. Connecting sends only an initialize request.",
+      "group": "setup",
+      "terms": [
+        "inspector"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#connect"
+      }
+    },
+    {
+      "id": "diagram",
+      "label": "How it fits",
+      "description": "Server, inspector, scanner, operator and the call path. Movable boxes, Simulate, Reset.",
+      "group": "concept",
+      "terms": [
+        "inspector"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#diagram"
+      }
+    },
+    {
+      "id": "limits",
+      "label": "What a scan cannot catch",
+      "description": "Result injection, rug-pulls after the scan, unfetched content and novel phrasing.",
+      "group": "reference",
+      "terms": [
+        "trust-on-first-use",
+        "scan-report"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#limits"
+      }
+    },
+    {
+      "id": "offline",
+      "label": "Scan a snapshot offline",
+      "description": "Paste or load a tools/list JSON and scan it with no server. Invisible characters are shown as [U+XXXX].",
+      "group": "try-it",
+      "terms": [
+        "bidi-zero-width",
+        "scan-report"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#offline"
+      }
+    },
+    {
+      "id": "server",
+      "label": "List, scan, then call",
+      "description": "See the tools, press Scan, read the findings with evidence, and only then call a tool behind the confirm step.",
+      "group": "try-it",
+      "terms": [
+        "tool-metadata",
+        "hidden-instruction",
+        "exfil-sink",
+        "name-shadowing",
+        "confirm-gate"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#server"
+      }
+    },
+    {
+      "id": "story-looked-clean",
+      "label": "Story: it looked clean, then changed",
+      "description": "A clean scan is a statement about one list, not about the server.",
+      "group": "concept",
+      "terms": [
+        "trust-on-first-use",
+        "tool-poisoning"
+      ],
+      "story": "S02",
+      "action": {
+        "type": "route",
+        "href": "/#stories"
+      }
+    },
+    {
+      "id": "story-scan-first",
+      "label": "Story: scan before you trust",
+      "description": "Look at what the server says about itself before your agent does.",
+      "group": "concept",
+      "terms": [
+        "tool-poisoning",
+        "hidden-instruction",
+        "trust-on-first-use"
+      ],
+      "story": "S01",
+      "action": {
+        "type": "route",
+        "href": "/#stories"
+      }
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "fit",
+      "label": "How the inspector, scanner and operator fit",
+      "href": "/#diagram"
+    }
+  ],
+  "stories": [
+    {
+      "id": "S01",
+      "title": "An operator scans a server before any agent reads it",
+      "say": "Look at what the server says about itself before your agent does.",
+      "file": "web/src/data/stories/MT1-scan-before-you-trust.json"
+    },
+    {
+      "id": "S02",
+      "title": "The server looked clean, then changed",
+      "say": "A clean scan is a statement about one list, not about the server.",
+      "file": "web/src/data/stories/MT2-the-scan-is-not-a-guarantee.json"
+    }
+  ]
+}

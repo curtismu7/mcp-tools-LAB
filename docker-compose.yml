@@ -1,0 +1,24 @@
+# OrbStack:  HOST_PORT=4820 docker compose up --build -d   ->  http://127.0.0.1:4820
+# The server binds 0.0.0.0 INSIDE the container (MCPTOOLS_BIND is the opt-in, set in the Dockerfile), but the port is
+# published on loopback only. Do not change the 127.0.0.1 below: this tool connects to servers you name and can call their tools.
+# stdio connections launch the commands you type INSIDE this container, not on your machine.
+name: mcp-tools
+
+services:
+  mcp-tools:
+    build: .
+    ports:
+      - "127.0.0.1:${HOST_PORT:-4810}:4810"
+    environment:
+      PORT: "4810"
+      # The browser's Host header is 127.0.0.1:HOST_PORT; the Host check compares names only, so any HOST_PORT works.
+    volumes:
+      - mcp-tools-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  mcp-tools-data:

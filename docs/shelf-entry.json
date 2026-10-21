@@ -1,0 +1,28 @@
+{
+  "demos": [
+    {
+      "id": "mcp-tools",
+      "name": "MCP inspector",
+      "catalogId": "D3",
+      "kind": "Tester",
+      "description": "Connect to an MCP server, list its tools, resources and prompts, scan them, then call tools behind a confirm step. One app with the scanner (D4).",
+      "url": "http://localhost:4810",
+      "healthPath": "/api/health",
+      "composeFile": "/Users/cmuir/Development/mcp-tools/docker-compose.yml",
+      "composeOverlays": [],
+      "notes": "Host-run: npm start (port 4810). Or: docker compose up --build -d (publishes 127.0.0.1:4810 only). Edit composeFile to this checkout's absolute path. D3 and D4 are one app, so docs/shelf-entry.json lists it twice with the same URL."
+    },
+    {
+      "id": "mcp-scanner",
+      "name": "MCP scanner",
+      "catalogId": "D4",
+      "kind": "Tester",
+      "description": "Scan the metadata an MCP server serves, or a pasted tools/list snapshot, for tool poisoning before an agent reads it. Reports; never blocks. Same app as the inspector (D3).",
+      "url": "http://localhost:4810",
+      "healthPath": "/api/health",
+      "composeFile": "/Users/cmuir/Development/mcp-tools/docker-compose.yml",
+      "composeOverlays": [],
+      "notes": "Host-run: npm start (port 4810). Or: docker compose up --build -d (publishes 127.0.0.1:4810 only). Edit composeFile to this checkout's absolute path. D3 and D4 are one app, so docs/shelf-entry.json lists it twice with the same URL."
+    }
+  ]
+}

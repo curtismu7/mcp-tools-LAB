@@ -4,29 +4,7 @@ A scan reads the metadata an MCP server serves, before an agent ingests it, and 
 
 ## Rules
 
-Each rule has a stable id and one fixed severity (`info`, `warn`, `high`). The table is `server/src/scanner/rules.js`, also served by `GET /api/rules` and shown on the Limits page. Ids never change meaning.
-
-| Id | Severity | Kind | Flags |
-| --- | --- | --- | --- |
-| MT-HI-001 | high | hidden-instruction | an instruction tag (`<IMPORTANT>`, `<SYSTEM>`, ...) in metadata |
-| MT-HI-002 | high | hidden-instruction | "do not tell/mention the user" |
-| MT-HI-003 | high | hidden-instruction | an agent-directed imperative ("ignore previous", "before calling any tool") |
-| MT-EX-001 | high | exfil-sink | an argument default (URL or email) pointing off-box |
-| MT-EX-002 | warn | exfil-sink | argument or skill text asking for credentials, tokens or the full conversation |
-| MT-CR-001 | high | credential-harvest | a tool description telling the agent to collect passwords, codes or secrets |
-| MT-CR-002 | warn | credential-harvest | an argument named like a credential |
-| MT-SH-001 | high | name-shadowing | a tool name equal to one in your trusted list |
-| MT-SH-002 | warn | name-shadowing | a look-alike of a trusted name (case, separators, accents, Cyrillic/Greek letters) |
-| MT-SH-003 | high | name-shadowing | a description claiming primacy over another tool |
-| MT-SH-004 | high | name-shadowing | two tools in one list with the same name |
-| MT-SA-001 | warn | sensitive-action | resource/prompt content pointing at a payment or transfer |
-| MT-SA-002 | high | sensitive-action | resource/prompt content telling the agent to bypass approval |
-| MT-UC-001 | high | unicode-trick | bidirectional control characters |
-| MT-UC-002 | warn | unicode-trick | zero-width and other invisible characters |
-| MT-UC-003 | high | unicode-trick | Unicode tag characters (invisible ASCII; the hidden text is decoded into the detail) |
-| MT-UC-004 | warn | unicode-trick | a word mixing Latin with Cyrillic or Greek look-alikes |
-| MT-DS-001 | info | oversized-metadata | a tool description over 2000 characters |
-| MT-LM-001 | warn | scan-truncated | input beyond a budget; the rest was **not** scanned |
+Each rule has a stable id and one fixed severity (`info`, `warn`, `high`). The table is `server/src/scanner/rules.js`, also served by `GET /api/rules` and shown on the Limits page. Ids never change meaning. The full table, with where each rule looks and what it misses, is generated: [scan-rules.md](scan-rules.md).
 
 The first three kinds and their patterns are the original `mcp-scanner` behaviour. The library also exports `scan`, `scanResources`, `scanPrompts` and `scanAgentCard` with the original `[{tool, kind, detail}]` shape (one entry per tool, argument and kind), and the original tests run against them unchanged (`server/test/scanner.legacy.test.js`). One deliberate fix: the source treated `http://[::1]/` as off-box (an IPv6 hostname keeps its brackets); it is now loopback.
 

@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+/**
+ * Generates content-pack.json (repo root). Format: docs/content-pack.schema.json (a copy of the ID-JAG kit's schema).
+ * Glossary from content/terms.json; the two stories from web/src/data/stories. Deterministic: lists sorted by id, 2-space
+ * JSON, no timestamps. The git commit is recorded only when passed (--commit=<sha>).
+ * Pattern from hostile-mcp scripts/build-content-pack.mjs (same author).
+ *
+ * Story ids: the schema requires S<2 digits>; the in-app stories are MT1 and MT2, published here as S01 and S02.
+ * Sources: one. The only public documentation URL in the source READMEs is the MCP home page, named in the inspector's
+ * README. It was not fetched while writing this pack, so its status is "not-read".
+ *
+ *   node scripts/build-content-pack.mjs [--commit=<sha>]
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const PACK_PATH = path.join(ROOT, 'content-pack.json');
+const readJson = (rel) => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// In-app story id -> pack story id.
+const STORY_IDS = { MT1: 'S01', MT2: 'S02' };
+
+const CARDS = [
+  { id: 'connect', label: 'Connect to a server', description: 'Add an MCP server over HTTP or stdio. Connecting sends only an initialize request.', group: 'setup', href: '/#connect', terms: ['inspector'] },
+  { id: 'server', label: 'List, scan, then call', description: 'See the tools, press Scan, read the findings with evidence, and only then call a tool behind the confirm step.', group: 'try-it', href: '/#server', terms: ['tool-metadata', 'hidden-instruction', 'exfil-sink', 'name-shadowing', 'confirm-gate'] },
+  { id: 'offline', label: 'Scan a snapshot offline', description: 'Paste or load a tools/list JSON and scan it with no server. Invisible characters are shown as [U+XXXX].', group: 'try-it', href: '/#offline', terms: ['bidi-zero-width', 'scan-report'] },
+  { id: 'story-scan-first', label: 'Story: scan before you trust', description: 'Look at what the server says about itself before your agent does.', group: 'concept', href: '/#stories', terms: ['tool-poisoning', 'hidden-instruction', 'trust-on-first-use'], story: 'S01' },
+  { id: 'story-looked-clean', label: 'Story: it looked clean, then changed', description: 'A clean scan is a statement about one list, not about the server.', group: 'concept', href: '/#stories', terms: ['trust-on-first-use', 'tool-poisoning'], story: 'S02' },
+  { id: 'diagram', label: 'How it fits', description: 'Server, inspector, scanner, operator and the call path. Movable boxes, Simulate, Reset.', group: 'concept', href: '/#diagram', terms: ['inspector'] },
+  { id: 'limits', label: 'What a scan cannot catch', description: 'Result injection, rug-pulls after the scan, unfetched content and novel phrasing.', group: 'reference', href: '/#limits', terms: ['trust-on-first-use', 'scan-report'] },
+];
+
+export function buildPack({ commit } = {}) {
+  const pkg = readJson('package.json');
+  const stories = fs.readdirSync(path.join(ROOT, 'web/src/data/stories')).filter((f) => f.endsWith('.json')).map((f) => ({ f, s: readJson(`web/src/data/stories/${f}`) }))
+    .map(({ f, s }) => {
+      if (!STORY_IDS[s.id]) throw new Error(`story ${s.id} has no pack id in STORY_IDS`);
+      return { id: STORY_IDS[s.id], title: s.title.replace(/\{\{[^}]+\}\}/g, (m) => ({ '{{ada}}': 'An operator', '{{vocab.server}}': 'a server', '{{vocab.serverShort}}': 'The server' }[m] || 'the')), say: s.say, file: `web/src/data/stories/${f}` };
+    }).sort(byId);
+  const ids = new Set(stories.map((s) => s.id));
+  const pack = {
+    schema: 'demo-content-pack/1',
+    id: 'mcp-tools',
+    title: 'MCP tools: inspector and scanner',
+    version: pkg.version,
+    ...(commit ? { source: { repo: 'mcp-tools', commit } } : {}),
+    demo: { id: 'mcp-tools', name: 'MCP tools', catalog: 'D3', baseUrl: 'http://localhost:4810', doctor: '/api/health', tags: ['mcp', 'inspector', 'scanner', 'tool-poisoning'] },
+    glossary: readJson('content/terms.json').sort(byId),
+    sources: [{ id: 'mcp-home', title: 'Model Context Protocol', url: 'https://modelcontextprotocol.io', kind: 'website', use: 'Named as the MCP home page in the inspector README this repo was copied from. Not quoted here.', status: 'not-read', checked: '2026-10-21' }],
+    cards: CARDS.map(({ href, ...c }) => ({ ...c, action: { type: 'route', href } })).sort(byId),
+    diagrams: [{ id: 'fit', label: 'How the inspector, scanner and operator fit', href: '/#diagram' }],
+    stories,
+  };
+  for (const c of pack.cards) if (c.story && !ids.has(c.story)) throw new Error(`card ${c.id} names unknown story ${c.story}`);
+  return pack;
+}
+
+export const serialize = (pack) => `${JSON.stringify(pack, null, 2)}\n`;
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const commit = process.argv.find((a) => a.startsWith('--commit='))?.slice(9);
+  fs.writeFileSync(PACK_PATH, serialize(buildPack({ commit })));
+  console.log(`wrote ${path.relative(process.cwd(), PACK_PATH) || PACK_PATH}`);
+}

@@ -13,7 +13,7 @@ Press Scan on a connected server, read the findings with their evidence, and onl
 
 ## Status
 
-Built and tested. Last run: 63 server tests and 40 web tests pass, `npm run build` passes, and a browser pass in headless Chromium against a clean copy of the real hostile server and a benign server (connect with a write-only token, banner, scan, grouped findings with highlighted evidence, rug-pull signal on the second list, report download, confirm dialog, offline scan with [U+XXXX] chips, both stories, presenter mode, diagram drag/Simulate/Reset, light/dark/390px, no requests outside the origin, no console errors). That browser pass is a one-off script, not part of `npm test`.
+Built and tested. Last run: 72 server tests and 40 web tests pass and `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
 
 
 
@@ -27,7 +27,8 @@ Not verified:
 - The optional PingOne hosted-MCP connection (see below) has not been run against a real tenant.
 - The scanner's rules are heuristics checked against the hostile server and unit fixtures only; there is no corpus of real-world servers behind them, so the false-positive rate on real servers is unknown.
 - The stdio transport was tested against a small fixture server, not against third-party MCP servers.
-- The Docker image was built and run once on OrbStack (health 200, UI 200, non-root, data dir mode 700); it is not tested in CI.
+- The Docker image and compose file were built and run on OrbStack and checked by content (health, page, a pasted snapshot scan, the confirm gate, non-root); that is a manual check, not CI. CI only greps the compose file for the loopback-only port.
+- The e2e script needs a hostile-mcp checkout, git, npm and a Playwright Chromium; it is documented, not run by CI.
 - The hostile-server integration test is skipped when a `hostile-mcp` checkout is not next to this repo (`HOSTILE_MCP_SRC`), so CI without it does not run it.
 
 ## Run it
@@ -79,15 +80,27 @@ More in [docs/security.md](docs/security.md).
 ## Docker
 
 ```bash
-docker build -t mcp-tools .
-docker run --rm -p 127.0.0.1:4810:4810 -v mcp-tools-data:/data mcp-tools
+HOST_PORT=4820 docker compose up --build -d      # http://127.0.0.1:4820 (HOST_PORT defaults to 4810)
+docker compose down
 ```
 
-The image runs as a non-root user and binds all interfaces inside the container (`MCPTOOLS_BIND`); publish the port on loopback only, as above.
+The image runs as a non-root user. Inside the container the server listens on all interfaces (`MCPTOOLS_BIND`); `docker-compose.yml` publishes `127.0.0.1:HOST_PORT:4810` only, and a test fails if that changes. **stdio connections launch the command you type inside the container**, not on your machine; to scan a stdio server on your machine run the app on the host. Details: [docs/packaging.md](docs/packaging.md).
+
+## SE shelf, Learning Hub, browser run
+
+- Shelf: merge `docs/shelf-entry.json` (D3 and D4, one app) into the shelf's `.data/demos.local.json`; it shows Ready from `/api/health`.
+- Learning Hub: `content-pack.json`, regenerate and validate with `npm run content-pack`.
+- Browser run: `npm run build && npm run e2e` (needs a `hostile-mcp` checkout next to this repo; see [docs/packaging.md](docs/packaging.md)).
+
+## How it pairs with the other demos
+
+Inspector sees, scanner judges (and only reports), the Hostile MCP demo is the attack (and shows pinning, which detects change), the Privilege demo controls the calls. [docs/pairing.md](docs/pairing.md).
 
 ## Docs
 
-- [docs/scanner.md](docs/scanner.md): rules, severities, evidence, budgets, the report, and what a metadata scan does not catch.
+- [docs/scanner.md](docs/scanner.md): evidence, budgets, the report, and what a metadata scan does not catch.
+- [docs/scan-rules.md](docs/scan-rules.md): every rule with its severity, what it catches and what it misses (generated).
+- [docs/architecture.md](docs/architecture.md), [docs/packaging.md](docs/packaging.md), [docs/pairing.md](docs/pairing.md), [docs/scorecard-next.md](docs/scorecard-next.md) (D35 groundwork note; nothing built), [CHANGELOG.md](CHANGELOG.md).
 - [docs/security.md](docs/security.md): every rule above and the test that enforces it.
 - [docs/api.md](docs/api.md): the HTTP API.
 - [docs/scan-report.schema.json](docs/scan-report.schema.json): `scan-report/1`.
