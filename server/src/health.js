@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import express from 'express';
 import { pingoneEnabled } from './config.js';
+import { mockOnly } from './mock.js';
 import { allPassed, needsSetup, runChecks as defaultChecks } from './doctor.js';
 
 const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -24,7 +25,7 @@ export function createHealth({ runChecks = defaultChecks, env = process.env, now
   const router = express.Router();
   router.get('/', (_req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ schema: 'demo-health/1', at: last.at || now().toISOString(), state: last.state, runtime: pingoneEnabled(env) ? 'live' : 'offline', demo: DEMO });
+    res.json({ schema: 'demo-health/1', at: last.at || now().toISOString(), state: last.state, runtime: pingoneEnabled(env) ? 'live' : 'offline', ...(mockOnly(env) ? { mode: 'mock-only' } : {}), demo: DEMO });
   });
   router.all('/', (_req, res) => res.set('Allow', 'GET').status(405).json({ error: 'method_not_allowed' }));
   return { router, refresh, stop: () => clearInterval(timer) };

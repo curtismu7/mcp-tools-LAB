@@ -77,6 +77,8 @@ More in [docs/security.md](docs/security.md).
 
 `MCPTOOLS_PINGONE=1` adds a "PingOne hosted" connection type: Authorization Code + PKCE (with PAR) against **your own** PingOne OIDC app, then PingOne's hosted MCP server as one more connection with the same scan, call and confirm path. You must set `PINGONE_ENVIRONMENT_ID` and `PINGONE_MCP_CLIENT_ID` (there are no built-in defaults), register `http://127.0.0.1:PORT/api/pingone/callback`, and accept that this path has **not been exercised against a real tenant** in this repo. With the flag on and the ids missing, `/api/health` reports `needs-setup`.
 
+`MOCK_ONLY=1` (or `true`) is the hosted-mock switch: the server connects only to its two built-in sample servers (answered in-process, no sockets), refuses any URL, token, stdio command or PingOne request with `403 {error:"mock_only"}`, stores and reads nothing on the host, ignores `.env`, shows a banner, and `/api/health` reports `mode: "mock-only"`.
+
 ## Docker
 
 ```bash
