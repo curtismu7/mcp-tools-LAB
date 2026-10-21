@@ -1,0 +1,16 @@
+{
+  "id": "generic",
+  "displayName": "Generic",
+  "tagline": "Any company that connects agents to tools",
+  "vocab": {
+    "server": "a third-party MCP server",
+    "serverShort": "the server",
+    "benignTool": "a weather lookup",
+    "sensitiveTool": "a payments tool",
+    "team": "the platform team"
+  },
+  "cast": {
+    "ada": { "name": "Ada", "role": "Engineer who connects agents to MCP servers" },
+    "sam": { "name": "Sam", "role": "Security reviewer" }
+  }
+}

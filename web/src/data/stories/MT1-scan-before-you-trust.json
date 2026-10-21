@@ -1,0 +1,69 @@
+{
+  "id": "MT1",
+  "title": "{{ada}} scans {{vocab.server}} before any agent reads it",
+  "demos": [
+    "D3",
+    "D4",
+    "D6"
+  ],
+  "paths": {
+    "main": "Scan first",
+    "alt": "Skip the scan"
+  },
+  "goal": "{{ada}} wants an agent to use {{vocab.server}}. The agent will read every tool description as trusted context.",
+  "obstacle": "MCP does not inspect tool metadata. A description can carry hidden instructions, and nothing between the server and the agent will say so.",
+  "control": "The scanner reads the metadata first and reports what looks like poison, with evidence. It never blocks anything: {{ada}} decides, and a call needs an explicit confirm step.",
+  "say": "Look at what the server says about itself before your agent does.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Connect to {{vocab.serverShort}}",
+      "tell": "On Connect, add the server's URL. For this demo, start the Hostile MCP demo on a free port and use its /mcp address. Only an initialize request is sent.",
+      "say": "Connecting is not trusting. So far nothing has been called and nothing has been read into an agent.",
+      "why": "The tool is a viewer first, so the first contact can be harmless."
+    },
+    {
+      "n": 2,
+      "title": "See what it offers",
+      "tell": "Open the server. The Tools tab lists each tool with its description and schema as plain text. The banner says this server has not been scanned.",
+      "say": "These are the exact words an agent would be given. Most of them read like ordinary documentation.",
+      "why": "Poison is written to look like documentation, so reading is not the same as judging."
+    },
+    {
+      "n": 3,
+      "title": "Press Scan",
+      "tell": "Scan lists the tools, resources and prompts and reads resource and prompt content. It never calls a tool. Progress is announced on screen and to screen readers.",
+      "say": "The scan reads. It does not run anything on the server.",
+      "why": "A scan that executed tools would be the attack it is meant to find."
+    },
+    {
+      "n": 4,
+      "title": "Read the findings",
+      "tell": "Findings are grouped by severity. Each has a rule id, a plain explanation and the evidence with the matched words highlighted. Invisible characters appear as [U+XXXX] chips. Expect an instruction tag in one description and a default pointing off-box in another.",
+      "say": "Each finding shows its evidence, so you can check it rather than trust the scanner.",
+      "why": "A verdict you cannot check is just another thing to trust."
+    },
+    {
+      "n": 5,
+      "title": "Decide",
+      "tell": "The verdict is a report: it blocks nothing. {{ada}} and {{sam}} decide whether this server goes near an agent. 'No known pattern found' would not mean safe.",
+      "say": "The scan informs the decision. It does not make it.",
+      "why": "Blocking is a different job, done where calls happen. That is the Privilege demo, not this tool."
+    },
+    {
+      "n": 6,
+      "title": "Call only what you chose",
+      "tell": "Pick a tool, fill the form and press Review call. The confirm dialog shows the exact arguments; nothing is sent until you click Send. A tool the scan flagged carries a note on its result.",
+      "say": "You see exactly what will be sent, then you send it.",
+      "why": "The confirm step keeps a call a decision, not a side effect of browsing.",
+      "alt": {
+        "tell": "Without a scan, the same server's list goes straight into the agent. The hidden instruction in a description is read as part of the task, and nothing on screen would have said so.",
+        "say": "Skipping the scan did not make the server safe. It only made the poison invisible."
+      }
+    }
+  ],
+  "proof": {
+    "main": "The Hostile MCP demo's poisoned tools show up as High findings with highlighted evidence; its plain tools show none.",
+    "alt": "The same poisoned descriptions would reach the agent's context unread."
+  }
+}

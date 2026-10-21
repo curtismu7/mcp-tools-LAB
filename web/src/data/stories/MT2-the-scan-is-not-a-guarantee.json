@@ -1,0 +1,62 @@
+{
+  "id": "MT2",
+  "title": "{{vocab.serverShort}} looked clean, then changed",
+  "demos": ["D3", "D4", "D6"],
+  "paths": { "main": "Scan again", "alt": "Trust the first scan" },
+  "goal": "{{ada}} scanned {{vocab.serverShort}} last week and found no known pattern. The agent has been using it since.",
+  "obstacle": "A scan is one list at one moment. A server can serve a clean list now and a poisoned one later (a rug-pull), and a description can be poisoned in ways no rule knows.",
+  "control": "Scan again before each new session, and pin what you approved. Pinning and the rug-pull itself are the Hostile MCP demo. Controlling the calls is the Privilege demo.",
+  "say": "A clean scan is a statement about one list, not about the server.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "A list with nothing found",
+      "tell": "Scan the Hostile MCP demo's server once. Its tool get_stock_price has no finding on the first list. The verdict for that tool is worded 'no known pattern found'.",
+      "say": "No known pattern found. That is all the scan can honestly say.",
+      "why": "The words matter. 'Safe' would be a claim the scanner cannot back."
+    },
+    {
+      "n": 2,
+      "title": "Read the box that says what is not caught",
+      "tell": "Under every result is 'What this scan cannot catch': result-based injection, rug-pulls after the scan, content you did not fetch, novel phrasing, and whether a clean tool should be allowed at all.",
+      "say": "The scanner states its own limits on every result.",
+      "why": "A tool that hides its limits teaches people to over-trust it."
+    },
+    {
+      "n": 3,
+      "title": "Same server, later",
+      "tell": "Press Refresh list on the Tools tab. The Hostile MCP demo's rug-pull tool now has a different description, and the page says the list changed since the one you saw.",
+      "say": "The server did not change its name. It changed what it says.",
+      "why": "An approval of the name is not an approval of the text.",
+      "alt": {
+        "tell": "If {{ada}} only trusts last week's scan, the changed description reaches the agent with no warning at all.",
+        "say": "The old scan said nothing about today's list."
+      }
+    },
+    {
+      "n": 4,
+      "title": "Scan again",
+      "tell": "Press Scan. The changed tool now has a hidden-instruction finding with evidence. Only a fresh scan of the current list can say so.",
+      "say": "The second scan catches what the first one could not have seen.",
+      "why": "The rug-pull is caught only because the scan was repeated."
+    },
+    {
+      "n": 5,
+      "title": "What still gets through",
+      "tell": "A tool with clean metadata can return an instruction in its result. The scan never calls a tool, so it cannot see that. Novel wording and other languages can also slip past heuristics.",
+      "say": "The scan is a tripwire in front of the agent, not a wall.",
+      "why": "Knowing the gaps is how {{sam}} decides what else is needed."
+    },
+    {
+      "n": 6,
+      "title": "What to add",
+      "tell": "Re-scan before each session. Pin the hash of what you approved (the Hostile MCP demo shows this). Control which calls may happen and with what limits (the Privilege demo).",
+      "say": "See it, judge it, pin it, and control the calls. This tool does the first two.",
+      "why": "Each layer covers a gap the others leave."
+    }
+  ],
+  "proof": {
+    "main": "The second scan of the Hostile MCP demo flags get_stock_price, which the first scan did not.",
+    "alt": "Last week's clean result is still on record, and it no longer describes the server."
+  }
+}

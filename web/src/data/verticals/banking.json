@@ -1,0 +1,16 @@
+{
+  "id": "banking",
+  "displayName": "Bank",
+  "tagline": "A bank connecting agents to payments and account tools",
+  "vocab": {
+    "server": "a fintech partner's payments MCP server",
+    "serverShort": "the payments server",
+    "benignTool": "a branch-hours and exchange-rate lookup",
+    "sensitiveTool": "a transfer or beneficiary tool",
+    "team": "the bank's digital platform team"
+  },
+  "cast": {
+    "ada": { "name": "Priya", "role": "Engineer who connects an agent to a partner's server" },
+    "sam": { "name": "Tom", "role": "Model-risk and security reviewer" }
+  }
+}

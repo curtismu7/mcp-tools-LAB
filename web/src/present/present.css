@@ -1,0 +1,8 @@
+/* Presenter mode. Type scales through --present-scale; hiding is keyed on data-present and the data-admin-only tag. */
+:root { --present-scale: 1.25; }
+:root[data-present="1"] { font-size: calc(100% * var(--present-scale)); }
+:root[data-present="1"] [data-admin-only] { display: none !important; }
+.present-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.5rem 1rem; background: var(--card); color: var(--text); border-bottom: 2px solid var(--accent); }
+.present-bar__count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.present-bar__end { margin-left: auto; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -13,14 +13,14 @@ Press Scan on a connected server, read the findings with their evidence, and onl
 
 ## Status
 
-Built and tested. Last run: 63 server tests and 10 web tests pass, `npm run build` passes, and a manual pass in headless Chromium (connect, scan the real hostile server, preview and send a confirmed call, dark and 390px layouts, diagram drag and Simulate, no requests outside the origin, no console errors). That browser pass is a one-off script, not part of `npm test`.
+Built and tested. Last run: 63 server tests and 40 web tests pass, `npm run build` passes, and a browser pass in headless Chromium against a clean copy of the real hostile server and a benign server (connect with a write-only token, banner, scan, grouped findings with highlighted evidence, rug-pull signal on the second list, report download, confirm dialog, offline scan with [U+XXXX] chips, both stories, presenter mode, diagram drag/Simulate/Reset, light/dark/390px, no requests outside the origin, no console errors). That browser pass is a one-off script, not part of `npm test`.
 
 
 
 - Server: Streamable HTTP and stdio MCP clients, tools, resources, prompts and the other protocol methods, saved connections, the confirm-gated `tools/call`, the scanner library and CLI, `GET /api/health` (`demo-health/1`), doctor.
 - Scanner: 19 rules with stable ids and fixed severities (info, warn, high), evidence spans, invisible/bidi/tag/homoglyph detection with the characters made visible, name-shadowing against a trusted-names list, size/depth/count budgets that end in a "scan truncated" finding, and a machine-readable `scan-report/1` ([schema](docs/scan-report.schema.json)).
 - An integration test that clones the real [hostile-mcp](../hostile-mcp) server from a clean copy, runs it on a free loopback port and scans it: its poisoned tools are flagged, its benign ones are not, and the rug-pull shows up on the second list.
-- Web UI: connect, see, scan, findings with highlighted evidence, confirm-gated calls, offline snapshot scan, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), a limits page, light and dark themes. Untrusted strings render as inert text only.
+- Web UI: Connect page (saved connections, HTTP or stdio, test, write-only token), Server page (Tools / Resources / Prompts, scan-before-first-use banner, list-changed signal, Scan, verdict, findings by severity with evidence, "what this scan cannot catch"), a call panel with a schema form and a confirm dialog, offline snapshot scan with report download, two stories (generic, airlines and banking packs) with a presenter mode, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), a limits page, light and dark themes. Untrusted strings render as inert text only.
 
 Not verified:
 

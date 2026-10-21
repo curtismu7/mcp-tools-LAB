@@ -1,0 +1,16 @@
+{
+  "id": "airlines",
+  "displayName": "Airline",
+  "tagline": "An airline connecting agents to operations tools",
+  "vocab": {
+    "server": "a vendor's flight-operations MCP server",
+    "serverShort": "the flight-operations server",
+    "benignTool": "a gate and weather lookup",
+    "sensitiveTool": "a crew-payroll or rebooking tool",
+    "team": "the airline's operations platform team"
+  },
+  "cast": {
+    "ada": { "name": "Mark", "role": "Dispatcher who connects an agent to a new vendor server" },
+    "sam": { "name": "Mary", "role": "Operations security reviewer" }
+  }
+}
