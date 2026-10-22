@@ -7,7 +7,16 @@
 import fs from 'node:fs';
 
 export const MOCK_REFUSAL = { error: 'mock_only', message: 'Disabled in the hosted mock.' };
-export const mockOnly = (env = process.env) => ['1', 'true'].includes(String(env.MOCK_ONLY || '').trim().toLowerCase());
+// Fail closed: a typo must never silently leave live mode on a hosted copy. Anything not recognised throws, so the app will not boot.
+const ON = ['1', 'true', 'yes', 'on'];
+const OFF = ['', '0', 'false'];
+export function mockOnly(env = process.env) {
+  const v = String(env.MOCK_ONLY ?? '').trim().toLowerCase();
+  if (ON.includes(v)) return true;
+  if (OFF.includes(v)) return false;
+  throw Object.assign(new Error(`MOCK_ONLY has an unrecognised value (${JSON.stringify(v.slice(0, 20))}); use 1/true/yes/on or 0/false/unset. Refusing to start.`), { code: 'mock_only_bad_flag' });
+}
+const knownFixture = (f) => typeof f === 'string' && Object.hasOwn(FIXTURES, f);
 
 const hostile = JSON.parse(fs.readFileSync(new URL('./mock/hostile.json', import.meta.url), 'utf8'));
 
@@ -36,7 +45,7 @@ const rec = (fixture) => ({ id: `mock-${fixture}`, label: FIXTURES[fixture].labe
 
 // Same surface as the real clients (ensure, rpc, info, close), answered from memory.
 export function createMockClient(fixture) {
-  const f = FIXTURES[fixture];
+  const f = knownFixture(fixture) ? FIXTURES[fixture] : null;
   if (!f) throw Object.assign(new Error('unknown fixture'), { code: 'mock_only' });
   const info = { protocolVersion: '2025-06-18', serverInfo: f.serverInfo, capabilities: f.capabilities };
   return {
@@ -64,7 +73,7 @@ export function createMockStore() {
   return {
     file: null,
     create(body) {
-      if (body?.transport !== 'mock' || !FIXTURES[body.fixture]) throw Object.assign(new Error('unknown fixture'), { code: 'mock_only' });
+      if (body?.transport !== 'mock' || !knownFixture(body?.fixture)) throw Object.assign(new Error('unknown fixture'), { code: 'mock_only' });
       return rec(body.fixture);
     },
     get: (id) => all.find((c) => c.id === id) || null,
@@ -83,6 +92,6 @@ export function mockGuard() {
 // Applied to the parsed POST /connections body: only {transport:'mock', fixture} (+ label) is allowed.
 export function mockBodyAllowed(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
-  if (body.transport !== 'mock' || !FIXTURES[body.fixture]) return false;
+  if (body.transport !== 'mock' || !knownFixture(body.fixture)) return false;
   return Object.keys(body).every((k) => ['transport', 'fixture', 'label'].includes(k));
 }

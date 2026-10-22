@@ -9,7 +9,7 @@ const run = (mw, req) => new Promise((resolve) => {
 
 test('loopback names are recognised, others are not', () => {
   for (const h of ['localhost', '127.0.0.1', '127.9.9.9', '::1', '[::1]', 'LOCALHOST']) assert.ok(isLoopbackHost(h), h);
-  for (const h of ['example.com', '10.0.0.1', '0.0.0.0', '127.0.0.1.evil.test', '']) assert.ok(!isLoopbackHost(h), h);
+  for (const h of ['public.example', '10.0.0.1', '0.0.0.0', '127.0.0.1.evil.invalid', '']) assert.ok(!isLoopbackHost(h), h);
 });
 
 test('bind: loopback by default, anything else needs MCPTOOLS_BIND', () => {

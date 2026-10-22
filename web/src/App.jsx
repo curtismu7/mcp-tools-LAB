@@ -50,7 +50,7 @@ function Shell() {
         </label>
       </header>
       <PresentBar />
-      {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted mock: sample data only, nothing leaves this server</p>}
+      {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
       <main className="page" id="main" tabIndex={-1}>
         {page === "connect" && <Connect config={config} activeId={active?.id} onOpen={open} onRemoved={clear} />}
         {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} />}
