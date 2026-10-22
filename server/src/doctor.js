@@ -2,6 +2,7 @@
 // could be a secret (no tokens, no env values). Each check: { id, level: 'pass' | 'info' | 'setup' | 'fail', detail }.
 import fs from 'node:fs';
 import { dataDir, pingoneEnabled } from './config.js';
+import { mockOnly } from './mock.js';
 import { allowedHostNames, assertBindAllowed, bindHost } from './security.js';
 
 export function runChecks({ env = process.env } = {}) {
@@ -17,7 +18,8 @@ export function runChecks({ env = process.env } = {}) {
   } catch (e) { add('bind', 'fail', e.message); }
 
   const dir = dataDir(env);
-  try {
+  if (mockOnly(env)) add('state-dir', 'pass', 'mock-only: nothing is stored or read on this host');
+  else try {
     if (fs.existsSync(dir)) {
       const mode = fs.statSync(dir).mode & 0o777;
       add('state-dir', mode & 0o077 ? 'fail' : 'pass', `${dir} mode ${mode.toString(8)}${mode & 0o077 ? ' (must be 700: run chmod 700)' : ''}`);

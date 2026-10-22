@@ -77,6 +77,20 @@ More in [docs/security.md](docs/security.md).
 
 `MCPTOOLS_PINGONE=1` adds a "PingOne hosted" connection type: Authorization Code + PKCE (with PAR) against **your own** PingOne OIDC app, then PingOne's hosted MCP server as one more connection with the same scan, call and confirm path. You must set `PINGONE_ENVIRONMENT_ID` and `PINGONE_MCP_CLIENT_ID` (there are no built-in defaults), register `http://127.0.0.1:PORT/api/pingone/callback`, and accept that this path has **not been exercised against a real tenant** in this repo. With the flag on and the ids missing, `/api/health` reports `needs-setup`.
 
+`MOCK_ONLY=1` (or `true`) is the hosted-mock switch: the server connects only to its two built-in sample servers (answered in-process, no sockets), refuses any URL, token, stdio command or PingOne request with `403 {error:"mock_only"}`, stores and reads nothing on the host, ignores `.env`, shows a banner, and `/api/health` reports `mode: "mock-only"`.
+
+### Hosting the mock
+
+Defaults stay loopback-only. A hosted copy opts in explicitly, with all three:
+
+```
+MOCK_ONLY=1
+MCPTOOLS_BIND=0.0.0.0                       # listen on all interfaces (the image already sets this; a bare `node` run does not)
+MCPTOOLS_ALLOWED_HOSTS=mock.example.com     # comma-separated public Host name(s) the ingress forwards
+```
+
+`PORT` (default 4810) sets the port. Any other `Host` header gets `403 bad_host`, and with `MCPTOOLS_BIND` set but no allowed host the app answers only loopback names. Readiness probe: `GET /api/health` (contract `demo-health/1`, `mode: "mock-only"`). A probe sent to the pod IP carries that IP as its `Host` and is refused, so set the probe's `Host` header to the allowed name (Kubernetes `httpGet.httpHeaders: [{name: Host, value: mock.example.com}]`) or to `127.0.0.1`. Do not bake a `.env` into the image or build context: the image copies `server/src` and the built web app only, and `MOCK_ONLY=1` ignores `.env` anyway; pass settings as environment variables. Tests: `server/test/hosting.test.js`.
+
 ## Docker
 
 ```bash

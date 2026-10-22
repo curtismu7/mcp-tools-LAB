@@ -1,11 +1,16 @@
 // One live client per connection id. The only place a client is built from a stored connection.
+import { createMockClient } from '../mock.js';
 import { createHttpClient } from './http.js';
 import { createStdioClient } from './stdio.js';
 
-export function createManager({ store, pingone = null }) {
+export function createManager({ store, pingone = null, mock = false }) {
   const live = new Map();
 
   function build(conn) {
+    if (mock) { // mock-only: the single place a client is built, and it can only be an in-process fixture
+      if (conn.transport !== 'mock') throw Object.assign(new Error('Disabled in the hosted mock.'), { code: 'mock_only' });
+      return createMockClient(conn.fixture);
+    }
     if (conn.transport === 'stdio') return createStdioClient(conn);
     if (conn.transport === 'pingone') return createHttpClient({ url: pingone.mcpUrl(), getAuth: () => ['Authorization', `Bearer ${pingone.requireToken()}`] });
     return createHttpClient({ url: conn.url, getAuth: () => (conn.token ? [conn.authHeader || 'Authorization', conn.token] : null) });

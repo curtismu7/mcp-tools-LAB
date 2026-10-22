@@ -8,6 +8,17 @@ import { mockServer, sent } from "../../testUtil.js";
 beforeEach(() => { window.location.hash = ""; document.documentElement.removeAttribute("data-theme"); });
 afterEach(cleanup);
 
+describe("Connect page in the hosted mock", () => {
+  it("shows the banner and only the built-in samples (no URL or command form)", async () => {
+    mockServer({ "GET /api/config": () => ({ scanMaxBytes: 1048576, stdio: false, mockOnly: true, pingone: { enabled: false } }) });
+    render(<App />);
+    expect(await screen.findByText("Hosted mock: sample data only, nothing leaves this server")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /hostile sample server/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Server URL/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /stdio command/ })).toBeNull();
+  });
+});
+
 describe("Connect page", () => {
   it("lists saved connections as inert text and shows the token as set", async () => {
     mockServer();
