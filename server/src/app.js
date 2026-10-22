@@ -15,6 +15,7 @@ import { dataDir, pingoneEnabled, port as configPort, scanMaxBytes } from './con
 import { createHealth } from './health.js';
 import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
+import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } from './mock.js';
 import { createPingone } from './pingone.js';
 import { clip, scrub, scrubJson } from './redact.js';
 import { analyze, buildReport, parseSnapshot, SnapshotError } from './scanner/index.js';
@@ -28,8 +29,10 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const bad = (res, message, status = 400, error = status === 404 ? 'not_found' : 'bad_request') => res.status(status).json({ error, message });
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
-export function createApp({ env = process.env, store = createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null } = {}) {
-  const manager = createManager({ store, pingone });
+export function createApp({ env = process.env, store = mockOnly(env) ? createMockStore() : createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null } = {}) {
+  const mock = mockOnly(env);
+  if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
+  const manager = createManager({ store, pingone: mock ? null : pingone, mock });
   const maxScan = scanMaxBytes(env);
   const app = express();
   app.disable('x-powered-by');
@@ -46,6 +49,7 @@ export function createApp({ env = process.env, store = createStore({ dir: dataDi
   const small = express.json({ limit: '256kb' });
   const big = express.json({ limit: maxScan });
   api.use(sameOriginWrites());
+  if (mock) api.use(mockGuard());
   api.use('/health', health.router);
 
   // Text from a failing server or transport, with this connection's secrets removed.
@@ -63,8 +67,8 @@ export function createApp({ env = process.env, store = createStore({ dir: dataDi
   };
 
   api.get('/config', (_req, res) => res.json({
-    scanMaxBytes: maxScan, stdio: true,
-    pingone: pingone ? pingone.status() : { enabled: false },
+    scanMaxBytes: maxScan, stdio: !mock, mockOnly: mock,
+    pingone: pingone && !mock ? pingone.status() : { enabled: false },
   }));
   api.get('/rules', (_req, res) => res.json({ rules: Object.entries(RULES).map(([id, r]) => ({ id, ...r })), limits: LIMITS }));
   api.get('/protocol-methods', (_req, res) => res.json({ methods: PROTOCOL_METHODS }));
@@ -86,6 +90,7 @@ export function createApp({ env = process.env, store = createStore({ dir: dataDi
   }
   api.post('/connections', small, wrap(async (req, res) => {
     const body = isObject(req.body) ? req.body : {};
+    if (mock && !mockBodyAllowed(body)) return res.status(403).json(MOCK_REFUSAL); // url, token, command, env, pingone: all refused
     if (body.transport === 'pingone' && !pingone) return bad(res, 'PingOne is off. Set MCPTOOLS_PINGONE=1 (optional, untested here).', 400, 'pingone_disabled');
     let conn;
     try { conn = store.create(body); } catch (err) { return bad(res, err.message); }
@@ -196,7 +201,7 @@ export function createApp({ env = process.env, store = createStore({ dir: dataDi
   }));
 
   // ---- optional PingOne (off unless MCPTOOLS_PINGONE=1) -------------------
-  if (pingone) {
+  if (pingone && !mock) {
     api.get('/pingone/status', (_req, res) => res.json(pingone.status()));
     api.post('/pingone/login', wrap(async (_req, res) => {
       if (!pingone.configured()) return bad(res, 'Set PINGONE_ENVIRONMENT_ID and PINGONE_MCP_CLIENT_ID first.', 400, 'pingone_not_configured');
