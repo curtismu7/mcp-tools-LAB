@@ -44,6 +44,17 @@ export const SCENARIOS = {
     ],
   },
 };
+// Per step: what it prevents, the real message on the wire (where there is one), and where to see it in the app.
+const GUIDE = {
+  server: { prevents: "Trusting a server you have not looked at. Connecting is read-only; nothing runs.", message: null, page: "server", pageLabel: "Open the Server page" },
+  conn: { prevents: "Calling tools before you know what they are.", message: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }, null, 2), page: "server", pageLabel: "Connect in the Server page" },
+  scan: { prevents: "Hidden instructions in tool descriptions reaching the model unseen.", message: JSON.stringify({ result: { tools: [{ name: "get_time", description: "Get the current time. <instruction hidden from the user>" }] } }, null, 2), page: "server", pageLabel: "Scan in the Server page" },
+  findings: { prevents: "Acting on a server without knowing what the scan found.", message: JSON.stringify({ rule: "hidden-instruction", severity: "high", evidence: "the text the rule matched" }, null, 2), page: "server", pageLabel: "See findings in the Server page" },
+  you: { prevents: "A tool being called by software that no person chose.", message: null, page: null },
+  call: { prevents: "A call that does something other than the exact arguments you approved.", message: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_time", arguments: { tz: "UTC" } } }, null, 2), page: "server", pageLabel: "Call in the Server page" },
+  agent: { prevents: "Poisoned descriptions becoming trusted context for an agent.", message: null, page: null },
+  priv: { prevents: "Calls that exceed the rights or limits you set.", message: null, page: null },
+};
 const SPEEDS = [["0.5", "0.5x"], ["1", "1x"], ["2", "2x"], ["4", "4x"]];
 const BASE_MS = 1600;
 
@@ -61,8 +72,9 @@ function Box({ data }) {
 }
 const nodeTypes = { box: Box };
 
-export default function Diagram({ theme = "system" }) {
+export default function Diagram({ theme = "system", onNavigate }) {
   const [moved, setMoved] = useState(START);
+  const [selected, setSelected] = useState(null);
   const [scenario, setScenario] = useState("scan");
   const [speed, setSpeed] = useState("1");
   const [step, setStep] = useState(-1);
@@ -77,11 +89,14 @@ export default function Diagram({ theme = "system" }) {
   }, [running, step, steps.length, speed]);
 
   const simulate = () => { setStep(0); setRunning(true); };
-  const reset = () => { setRunning(false); setStep(-1); setMoved(START); };
+  const reset = () => { setRunning(false); setStep(-1); setMoved(START); setSelected(null); };
   const pick = (s) => { setScenario(s); setRunning(false); setStep(-1); };
   const onNodesChange = useCallback((c) => setMoved((n) => applyNodeChanges(c, n)), []);
 
   const cur = step >= 0 ? steps[step] : null;
+  const detailId = selected ?? (cur ? cur.nodes[cur.nodes.length - 1] : null);
+  const detail = detailId ? [...START].find((n) => n.id === detailId) : null;
+  const g = detailId ? GUIDE[detailId] : null;
   const nodes = useMemo(() => moved.map((n) => ({ ...n, type: "box", data: { ...n.data, on: !!cur?.nodes.includes(n.id), dim: !!cur && !cur.nodes.includes(n.id) } })), [moved, cur]);
   const edges = useMemo(() => EDGES.map((e) => ({ ...e, animated: !!cur?.edges.includes(e.id), className: cur?.edges.includes(e.id) ? "edge-on" : "", markerEnd: { type: MarkerType.ArrowClosed } })), [cur]);
 
@@ -97,11 +112,27 @@ export default function Diagram({ theme = "system" }) {
       </div>
       <div className="flow-wrap" role="group" aria-label="Diagram: MCP server, connection, scan, findings, your decision, tools/call and the Privilege demo. Boxes can be dragged.">
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} colorMode={theme}
-          fitView fitViewOptions={{ padding: 0.12 }} nodesConnectable={false} proOptions={{ hideAttribution: true }} minZoom={0.2}>
+          fitView fitViewOptions={{ padding: 0.12 }} nodesConnectable={false} onNodeClick={(_, n) => setSelected(n.id)} proOptions={{ hideAttribution: true }} minZoom={0.2}>
           <Background />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
+      <section className="card guide" aria-live="polite" aria-labelledby="guide-h" data-testid="guide">
+        {detail && g ? (
+          <>
+            <h3 id="guide-h">{detail.data.title}</h3>
+            <p>{detail.data.sub}</p>
+            <p><strong>What this prevents:</strong> {g.prevents}</p>
+            {g.message && (<><p>The real message for this step:</p><pre className="guide-msg">{g.message}</pre></>)}
+            {g.page && <button type="button" className="btn" onClick={() => onNavigate?.(g.page)}>{g.pageLabel}</button>}
+          </>
+        ) : (
+          <>
+            <h3 id="guide-h">About each step</h3>
+            <p>Click any box, or press Simulate, to see what that step does and where to see it in the app.</p>
+          </>
+        )}
+      </section>
       <p className="caption" role="status" aria-live="polite" data-testid="caption">
         {cur ? `Step ${step + 1} of ${steps.length}: ${cur.text}` : "Press Simulate to walk one run through the diagram."}
       </p>

@@ -56,7 +56,7 @@ function Shell() {
         {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} />}
         {page === "offline" && <Offline config={config} />}
         {page === "stories" && <Stories />}
-        {page === "diagram" && <Diagram theme={theme} />}
+        {page === "diagram" && <Diagram theme={theme} onNavigate={setPage} />}
         {page === "limits" && <Limits />}
       </main>
     </>

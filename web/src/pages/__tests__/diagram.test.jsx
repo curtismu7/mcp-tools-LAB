@@ -53,3 +53,33 @@ describe("Limits page and theme", () => {
     expect(within(row).getByText("high")).toBeInTheDocument();
   });
 });
+
+describe("Diagram guide", () => {
+  it("explains the step being played: what it prevents and the real message on the wire", async () => {
+    mockServer();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<App />);
+    await act(async () => { fireEvent.click(await screen.findByRole("link", { name: "How it fits" })); });
+    expect(screen.getByTestId("guide")).toHaveTextContent("About each step");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Simulate" })); });
+    expect(screen.getByTestId("guide")).toHaveTextContent("Calling tools before you know what they are.");
+    expect(screen.getByTestId("guide")).toHaveTextContent("tools/list");
+  });
+
+  it("selects a box on click and shows what its step prevents", async () => {
+    mockServer();
+    render(<App />);
+    await act(async () => { fireEvent.click(await screen.findByRole("link", { name: "How it fits" })); });
+    fireEvent.click(screen.getByText("Scan: JUDGE"));
+    expect(screen.getByTestId("guide")).toHaveTextContent("Hidden instructions in tool descriptions reaching the model unseen.");
+  });
+
+  it("jumps from a step to the matching page in the app", async () => {
+    mockServer();
+    render(<App />);
+    await act(async () => { fireEvent.click(await screen.findByRole("link", { name: "How it fits" })); });
+    fireEvent.click(screen.getByText("Scan: JUDGE"));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Scan in the Server page" })); });
+    expect(screen.getByRole("link", { name: "Server" })).toHaveAttribute("aria-current", "page");
+  });
+});
