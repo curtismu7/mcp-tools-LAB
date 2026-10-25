@@ -1,0 +1,128 @@
+# SE k8s mock-only deployment of MCP Tools. Tokens (__IMAGE__, __MOCK_HOST__, __NAMESPACE__) are rendered with sed.
+# No login (owner decision). Mock-only: MOCK_ONLY=1 refuses every outside URL and stdio command.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-tools-mock
+  labels: &labels
+    app.kubernetes.io/name: mcp-tools-mock
+    app.kubernetes.io/part-of: standalone-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mcp-tools-mock
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mcp-tools
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4810
+          env:
+            - { name: MOCK_ONLY, value: "1" }
+            - { name: PORT, value: "4810" }
+            - { name: DATA_DIR, value: /data }
+            - { name: MCPTOOLS_ALLOWED_HOSTS, value: "__MOCK_HOST__" }
+          # The host guard answers 403 to any Host it does not know, including the kubelet's pod-IP Host, so probes send the real one.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+              httpHeaders:
+                - { name: Host, value: "__MOCK_HOST__" }
+            initialDelaySeconds: 3
+            periodSeconds: 15
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+              httpHeaders:
+                - { name: Host, value: "__MOCK_HOST__" }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+        - name: data
+          emptyDir: { sizeLimit: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-tools-mock
+  labels:
+    app.kubernetes.io/name: mcp-tools-mock
+    app.kubernetes.io/part-of: standalone-mock
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mcp-tools-mock
+  ports:
+    - { name: http, port: 4810, targetPort: http }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mcp-tools-mock
+  labels:
+    app.kubernetes.io/name: mcp-tools-mock
+    app.kubernetes.io/part-of: standalone-mock
+spec:
+  secretName: mcp-tools-mock-tls
+  dnsNames:
+    - __MOCK_HOST__
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-pdo
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-tools-mock
+  labels:
+    app.kubernetes.io/name: mcp-tools-mock
+    app.kubernetes.io/part-of: standalone-mock
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx-public
+  tls:
+    - hosts: [__MOCK_HOST__]
+      secretName: mcp-tools-mock-tls
+  rules:
+    - host: __MOCK_HOST__
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mcp-tools-mock
+                port: { name: http }
