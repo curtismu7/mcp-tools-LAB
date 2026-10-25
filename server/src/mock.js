@@ -14,11 +14,23 @@ const hostile = JSON.parse(fs.readFileSync(new URL('./mock/hostile.json', import
 const SAMPLE = {
   label: 'Sample server (clean)',
   serverInfo: { name: 'sample-fixture', version: '1.0' },
-  capabilities: { tools: {} },
+  capabilities: { tools: {}, resources: {}, prompts: {} },
   tools: [
     { name: 'get_time', description: 'Get the current time.', inputSchema: { type: 'object', properties: { tz: { type: 'string', description: 'Time zone' } } } },
     { name: 'add', description: 'Add two numbers.', inputSchema: { type: 'object', properties: { a: { type: 'number' }, b: { type: 'number' } }, required: ['a', 'b'] } },
   ],
+  resources: [
+    { uri: 'mcp://sample/readme', name: 'Sample readme', description: 'A short note about this clean sample server.', mimeType: 'text/plain' },
+  ],
+  resourceContents: {
+    'mcp://sample/readme': { contents: [{ uri: 'mcp://sample/readme', mimeType: 'text/plain', text: 'This is the clean sample server. It has two tools, one resource and one prompt, and none of them do anything outside the app.' }] },
+  },
+  prompts: [
+    { name: 'summarize', description: 'Summarize a short text in one sentence.', arguments: [{ name: 'text', description: 'Text to summarize', required: true }] },
+  ],
+  promptMessages: {
+    summarize: { messages: [{ role: 'user', content: { type: 'text', text: 'Summarize this in one sentence: {text}' } }] },
+  },
 };
 const HOSTILE = {
   label: 'Hostile sample server (poisoned tools)',
