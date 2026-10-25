@@ -116,3 +116,7 @@ main:focus { outline: none; }
 .modal__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
 .top .btn { min-height: 2rem; }
 @media (max-width: 40rem) { .flow-wrap { height: 24rem; } .story__body { margin-left: 0.5rem; } }
+
+/* Diagram guide: the real message for a step, in the app's mono face and tokens. */
+.guide { margin-top: 1rem; }
+.guide-msg { font-family: var(--mono); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: .75rem; overflow-x: auto; white-space: pre-wrap; }
