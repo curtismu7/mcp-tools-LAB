@@ -3,8 +3,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 6 * * *'  # nightly: the full Node 20 + 22 build, so main merges do not pay for it
 jobs:
   build:
+    # Push to main skips this: the pull request already ran it. Pull requests run Node 22; the nightly run does 20 and 22.
+    if: github.event_name != 'push'
     # Set the repository variable RUNS_ON (JSON, e.g. ["ubuntu-latest"]) to change the runner.
     runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
     strategy:
@@ -20,6 +24,7 @@ jobs:
       - run: npm test
       - run: npm run build
   secrets:
+    if: github.event_name != 'schedule'
     # Fails the PR if any commit in its history contains a secret.
     runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
     steps:
