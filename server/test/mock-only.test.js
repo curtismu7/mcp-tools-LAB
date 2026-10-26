@@ -40,7 +40,7 @@ test('MOCK_ONLY=1 refuses arbitrary URLs with 403 mock_only and never contacts t
   const t = await trap();
   try {
     await withApp({ env: ON }, async ({ call }) => {
-      for (const url of ['http://169.254.169.254/', 'http://127.0.0.1:22/', `http://127.0.0.1:${t.port}/redirect`, 'http://localhost:1/mcp', 'https://example.com/mcp']) {
+      for (const url of ['http://169.254.169.254/', 'http://127.0.0.1:22/', `http://127.0.0.1:${t.port}/redirect`, 'http://localhost:1/mcp', 'https://svc.example/mcp']) {
         const r = await call('POST', '/api/connections', { transport: 'http', label: 'x', url });
         assert.equal(r.status, 403, url);
         assert.deepEqual(r.json, REFUSAL);
