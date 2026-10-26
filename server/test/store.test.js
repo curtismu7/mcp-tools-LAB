@@ -8,7 +8,7 @@ import { tmpDir } from './helpers.js';
 test('http connections persist with mode 600 in a mode 700 directory; the token is never in the public view', () => {
   const dir = path.join(tmpDir(), 'state');
   const store = createStore({ dir });
-  const rec = store.create({ transport: 'http', label: 'a', url: 'https://example.com/mcp?key=qwerty123', authHeader: 'Authorization', token: 'Bearer s3cr3t-token' });
+  const rec = store.create({ transport: 'http', label: 'a', url: 'https://svc.example/mcp?key=qwerty123', authHeader: 'Authorization', token: 'Bearer s3cr3t-token' });
   assert.equal(fs.statSync(store.file).mode & 0o777, 0o600);
   assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
   const view = store.publicView(rec);
@@ -38,7 +38,7 @@ test('stdio connections are session-only: never written to disk, never read from
 test('validation: bad scheme, credentials in the URL, missing command', () => {
   const store = createStore({ dir: tmpDir() });
   assert.throws(() => store.create({ transport: 'http', url: 'file:///etc/passwd' }), /http or https/);
-  assert.throws(() => store.create({ transport: 'http', url: 'https://u:p@example.com/' }), /credentials/);
+  assert.throws(() => store.create({ transport: 'http', url: 'https://u:p@svc.example/' }), /credentials/);
   assert.throws(() => store.create({ transport: 'http', url: 'nope' }), /valid URL/);
   assert.throws(() => store.create({ transport: 'stdio', command: ' ' }), /command/);
   assert.throws(() => store.create({ transport: 'ws', url: 'ws://x' }), /transport/);

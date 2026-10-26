@@ -13,7 +13,7 @@ import { createMockStore } from '../src/mock.js';
 
 const ENTRY = fileURLToPath(new URL('../src/index.js', import.meta.url));
 const T = { timeout: 60_000 };
-const HOSTED = 'mock.example.test';
+const HOSTED = 'mock.mcp-tools.example';
 
 const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 // fetch() cannot set Host, so use http.request to send the Host header a proxy or ingress would.
@@ -47,7 +47,7 @@ test('hosted mock: MOCK_ONLY + MCPTOOLS_BIND + MCPTOOLS_ALLOWED_HOSTS serves the
       assert.equal(res.status, 200, host);
       assert.equal(JSON.parse(res.body).mode, 'mock-only');
     }
-    for (const host of ['evil.example.test', `${HOSTED}.evil.test`, '10.1.2.3:4810']) {
+    for (const host of ['evil.mcp-tools.example', `${HOSTED}.evil.invalid`, '10.1.2.3:4810']) {
       const res = await get(port, '/api/health', host);
       assert.equal(res.status, 403, `Host "${host}"`);
       assert.equal(JSON.parse(res.body).error, 'bad_host');
