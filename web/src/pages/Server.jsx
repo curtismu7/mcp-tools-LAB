@@ -83,7 +83,24 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
   // Is the scan of the list that is shown now? "none" = never scanned, "older" = the list changed since the scan.
   const scanCover = useMemo(() => (!report ? "none" : !tools || listKey(report ? scan.listed.tools : []) === listKey(tools) ? "current" : "older"), [report, scan, tools]);
 
-  if (!conn) return (<><h2>Server</h2><p className="notice">No server is connected. Go to Connect, choose a saved connection and press Open.</p></>);
+  if (!conn) return (
+    <>
+      <h2>Server</h2>
+      <section className="card" aria-labelledby="teach-h">
+        <h3 id="teach-h">What this page teaches</h3>
+        <p>An MCP server describes its tools, resources and prompts to whatever connects to it. The text it sends is trusted by the model, so you have to look at it before you use it.</p>
+        <p><strong>How to run it</strong></p>
+        <ol>
+          <li>Go to <strong>Connect</strong> in the menu above.</li>
+          <li>Press <strong>Open the clean sample server</strong>, or <strong>Open the hostile sample server</strong>. The hostile one has hidden instructions in its descriptions.</li>
+          <li>Come back here. The tools, resources and prompts it lists appear. Nothing is called yet.</li>
+          <li>Press <strong>Scan</strong>. The rules read the descriptions and report what they find. A clean result is not proof of safety.</li>
+          <li>Read the findings. Only then, if you want, call a tool. The confirm dialog shows the exact arguments first.</li>
+        </ol>
+        <p className="muted">Try both samples and compare the scan results. That difference is the lesson.</p>
+      </section>
+    </>
+  );
 
   return (
     <>
