@@ -117,6 +117,17 @@ main:focus { outline: none; }
 .top .btn { min-height: 2rem; }
 @media (max-width: 40rem) { .flow-wrap { height: 24rem; } .story__body { margin-left: 0.5rem; } }
 
-/* Diagram guide: the real message for a step, in the app's mono face and tokens. */
+/* Diagram guide: the step detail; its messages are the On the wire panel below. */
 .guide { margin-top: 1rem; }
-.guide-msg { font-family: var(--mono); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: .75rem; overflow-x: auto; white-space: pre-wrap; }
+
+/* On the wire panel: request and response side by side, the token split into its three parts, key claims marked. */
+.wire h4 { margin: 0.5rem 0 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.wire .badge { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; padding: 0 0.35rem; vertical-align: middle; }
+.wire__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.wire__pre { margin: 0; font-family: var(--mono); font-size: 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wire__jwt { font-family: var(--mono); font-size: 0.8rem; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0 0 0.5rem; }
+.jwt-h { color: var(--deny); } .jwt-p { color: var(--info); } .jwt-s { color: var(--ok); }
+.wire__focus td { background: var(--hold-wash); }
+.wire__notice { padding: 0.5rem 0.8rem; border-left: 4px solid var(--accent); background: var(--bg); border-radius: 4px; }
+.wire dl { margin: 0.5rem 0; } .wire dd { margin: 0 0 0.4rem 1rem; }
+@media (max-width: 40rem) { .wire__cols { grid-template-columns: 1fr; } }

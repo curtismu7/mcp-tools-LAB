@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { post, pretty } from "../lib/api.js";
 import { Untrusted } from "../lib/Untrusted.jsx";
+import WirePanel from "./WirePanel.jsx";
+import { callWire } from "../lib/wire.js";
 
 // The confirm step. 1) Preview asks the server for the canonical arguments and their hash. 2) The operator reads exactly
 // that text and ticks the box. 3) Send posts {confirm:true, argsHash}. Changing anything resets to step 1.
@@ -44,6 +46,12 @@ export default function ConfirmCall({ connectionId, kind, name, params, warn }) 
           </label>
           <button type="button" className="btn primary" onClick={send} disabled={busy || !seen}>Send call</button>
         </div>
+      )}
+      {preview && kind === "tool" && (
+        <details className="card inner" data-testid="wire-details">
+          <summary>What went over the wire</summary>
+          <WirePanel heading="On the wire" wire={callWire(name, preview.canonical, result && !result.error ? result.result : null)} />
+        </details>
       )}
       {result && (
         <div className="result" role="status" aria-live="polite" data-testid="result">

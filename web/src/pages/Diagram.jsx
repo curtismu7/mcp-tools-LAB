@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, applyNodeChanges } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import WirePanel from "../components/WirePanel.jsx";
+import { WIRE } from "../lib/wire.js";
 
 // One server: connect and see it, the scan JUDGES (and only reports), you decide, the confirm dialog gates the
 // call, and the Privilege demo (a separate product) CONTROLS calls on the wire. Boxes are draggable; Simulate walks one
@@ -44,16 +46,16 @@ export const SCENARIOS = {
     ],
   },
 };
-// Per step: what it prevents, the real message on the wire (where there is one), and where to see it in the app.
+// Per step: what it prevents and where to see it in the app. The messages on the wire are in lib/wire.js (WIRE).
 const GUIDE = {
-  server: { prevents: "Trusting a server you have not looked at. Connecting is read-only; nothing runs.", message: null, page: "server", pageLabel: "Open the Server page" },
-  conn: { prevents: "Calling tools before you know what they are.", message: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }, null, 2), page: "server", pageLabel: "Connect in the Server page" },
-  scan: { prevents: "Hidden instructions in tool descriptions reaching the model unseen.", message: JSON.stringify({ result: { tools: [{ name: "get_time", description: "Get the current time. <instruction hidden from the user>" }] } }, null, 2), page: "server", pageLabel: "Scan in the Server page" },
-  findings: { prevents: "Acting on a server without knowing what the scan found.", message: JSON.stringify({ rule: "hidden-instruction", severity: "high", evidence: "the text the rule matched" }, null, 2), page: "server", pageLabel: "See findings in the Server page" },
-  you: { prevents: "A tool being called by software that no person chose.", message: null, page: null },
-  call: { prevents: "A call that does something other than the exact arguments you approved.", message: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_time", arguments: { tz: "UTC" } } }, null, 2), page: "server", pageLabel: "Call in the Server page" },
-  agent: { prevents: "Poisoned descriptions becoming trusted context for an agent.", message: null, page: null },
-  priv: { prevents: "Calls that exceed the rights or limits you set.", message: null, page: null },
+  server: { prevents: "Trusting a server you have not looked at. Connecting is read-only; nothing runs.", page: "server", pageLabel: "Open the Server page" },
+  conn: { prevents: "Calling tools before you know what they are.", page: "server", pageLabel: "Connect in the Server page" },
+  scan: { prevents: "Hidden instructions in tool descriptions reaching the model unseen.", page: "server", pageLabel: "Scan in the Server page" },
+  findings: { prevents: "Acting on a server without knowing what the scan found.", page: "server", pageLabel: "See findings in the Server page" },
+  you: { prevents: "A tool being called by software that no person chose.", page: null },
+  call: { prevents: "A call that does something other than the exact arguments you approved.", page: "server", pageLabel: "Call in the Server page" },
+  agent: { prevents: "Poisoned descriptions becoming trusted context for an agent.", page: null },
+  priv: { prevents: "Calls that exceed the rights or limits you set.", page: null },
 };
 const SPEEDS = [["0.5", "0.5x"], ["1", "1x"], ["2", "2x"], ["4", "4x"]];
 const BASE_MS = 1600;
@@ -123,7 +125,7 @@ export default function Diagram({ theme = "system", onNavigate }) {
             <h3 id="guide-h">{detail.data.title}</h3>
             <p>{detail.data.sub}</p>
             <p><strong>What this prevents:</strong> {g.prevents}</p>
-            {g.message && (<><p>The real message for this step:</p><pre className="guide-msg">{g.message}</pre></>)}
+            {WIRE[detailId] && <WirePanel wire={WIRE[detailId]} />}
             {g.page && <button type="button" className="btn" onClick={() => onNavigate?.(g.page)}>{g.pageLabel}</button>}
           </>
         ) : (
