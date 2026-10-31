@@ -4,17 +4,16 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 6 * * *'  # nightly: the full Node 20 + 22 build, so main merges do not pay for it
+    - cron: '0 6 * * *'  # nightly: the full Node 26 build, so main merges do not pay for it
 jobs:
   build:
-    # Push to main skips this: the pull request already ran it. Pull requests run Node 22; the nightly run does 20 and 22.
+    # Push to main skips this: the pull request already ran it. Pull requests and the nightly run use Node 26.
     if: github.event_name != 'push'
     # Set the repository variable RUNS_ON (JSON, e.g. ["ubuntu-latest"]) to change the runner.
     runs-on: ${{ fromJSON(vars.RUNS_ON || '["self-hosted","macOS"]') }}
     strategy:
       matrix:
-        # PRs test the newest Node only; main tests both supported versions.
-        node: ${{ github.event_name == 'pull_request' && fromJSON('[22]') || fromJSON('[20, 22]') }}
+        node: [26]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

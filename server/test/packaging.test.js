@@ -51,9 +51,9 @@ test('the port parser flags an unbound or wildcard publish', () => {
   }
 });
 
-test('the image is Node 22 and runs as a non-root user', () => {
+test('the image is Node 26 and runs as a non-root user', () => {
   const d = read('Dockerfile');
-  assert.match(d, /^FROM node:22/m);
+  assert.match(d, /^FROM node:26/m);
   assert.match(d, /^USER node$/m);
   assert.ok(d.lastIndexOf('USER node') > d.lastIndexOf('RUN '), 'USER is set after the last RUN');
 });
