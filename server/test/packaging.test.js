@@ -90,15 +90,31 @@ test('the validator rejects a broken pack', () => {
   assert.ok(validatePack(pack).length >= 2);
 });
 
-test('the pack has the required terms, two story cards, and only the one source taken from a README', () => {
+test('the pack has the required terms, three story cards, and only the one source taken from a README', () => {
   const pack = buildPack();
   for (const id of ['tool-metadata', 'tool-poisoning', 'hidden-instruction', 'exfil-sink', 'name-shadowing', 'bidi-zero-width', 'scan-report', 'trust-on-first-use', 'confirm-gate', 'inspector']) assert.ok(pack.glossary.some((g) => g.id === id), id);
-  assert.deepEqual(pack.cards.filter((c) => c.story).map((c) => c.story).sort(), ['S01', 'S02']);
+  assert.deepEqual(pack.cards.filter((c) => c.story).map((c) => c.story).sort(), ['S01', 'S02', 'S03']);
   assert.deepEqual(pack.sources.map((s) => s.url), ['https://modelcontextprotocol.io']);
   const name = 'mcp-inspector-README.md';
   assert.equal(sha(copy(name)), provenance[name].sha256, 'the committed README copy matches its recorded sha256');
   assert.ok(copy(name).includes(pack.sources[0].url), `the source URL appears in the inspector README at ${provenance[name].commit.slice(0, 9)}`);
   assert.equal(JSON.stringify(pack).match(/pingone\.(com|eu|asia|ca)|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g), null);
+});
+
+test('the pack carries the release-claim terms and the why-it-matters entries, every one labelled as a Ping claim', () => {
+  const pack = buildPack();
+  const by = (id) => pack.glossary.find((g) => g.id === id);
+  for (const id of ['entitlement-aware-discovery', 'aggregate-policy-cap', 'mcp-aggregate', 'tool-filter', 'filtered-listing-scan', 'why-mcp-gateway', 'why-mcp-aggregate']) assert.ok(by(id), id);
+  for (const id of ['entitlement-aware-discovery', 'aggregate-policy-cap', 'why-mcp-gateway', 'why-mcp-aggregate']) assert.match(by(id).definition, /UNVERIFIED on our tenant/, id);
+  for (const id of ['why-mcp-gateway', 'why-mcp-aggregate']) for (const label of ['Challenge:', 'Technical:', 'Business:']) assert.ok(by(id).definition.includes(label), `${id} ${label}`);
+  // the two lines come from prompt section 10 rows 36 and 37
+  assert.match(by('why-mcp-gateway').definition, /One shared token and every tool exposed to every caller|one shared token and every tool exposed to every caller/);
+  assert.match(by('why-mcp-aggregate').definition, /one policy cap enforced twice/);
+  assert.match(by('mcp-aggregate').definition, /console swagger names, 2026-10-31, schema only/i);
+  assert.doesNotMatch(by('aggregate-policy-cap').definition, /swagger name/i, 'the cap has no console field, so it is never tagged as one');
+  for (const c of pack.cards.filter((x) => x.terms)) for (const t of c.terms) assert.ok(by(t), `${c.id} names unknown term ${t}`);
+  assert.ok(pack.cards.some((c) => c.id === 'entitled-listing' && c.action.href === '/#gateway'));
+  assert.doesNotMatch(JSON.stringify(pack), /\bdoor\b/i);
 });
 
 test('docs/scan-rules.md is exactly what the generator produces (run: node scripts/build-scan-rules.mjs)', () => {

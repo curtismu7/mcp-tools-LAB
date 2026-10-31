@@ -22,7 +22,8 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "e2e": "node scripts/e2e.mjs",
     "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs",
-    "docs": "node scripts/build-scan-rules.mjs"
+    "docs": "node scripts/build-scan-rules.mjs",
+    "mutate": "node scripts/mutate-release-feature.mjs"
   },
   "devDependencies": {
     "ajv": "^8.20.0",

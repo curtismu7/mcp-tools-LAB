@@ -6,8 +6,8 @@ import { validateStory, validateVertical } from "../storySchema";
 const good = () => JSON.parse(JSON.stringify(STORIES[0]));
 
 describe("shipped data", () => {
-  it("has the two stories and the generic, airlines and banking packs", () => {
-    expect(STORIES.map((s) => s.id)).toEqual(["MT1", "MT2"]);
+  it("has the three stories and the generic, airlines and banking packs", () => {
+    expect(STORIES.map((s) => s.id)).toEqual(["MT1", "MT2", "MT3"]);
     expect(VERTICALS.map((v) => v.id).sort()).toEqual(["airlines", "banking", "generic"]);
   });
   it.each(STORIES.map((s) => [s.id, s]))("story %s is valid", (_id, s) => expect(validateStory(s)).toEqual([]));
@@ -23,6 +23,28 @@ describe("shipped data", () => {
   it("the stories reference the Hostile MCP demo and never call a clean scan safe", () => {
     expect(JSON.stringify(storyById("MT2"))).toMatch(/Hostile MCP demo/);
     for (const s of STORIES) expect(JSON.stringify(s)).not.toMatch(/\bis safe\b|\bsafe server\b/i);
+  });
+});
+
+describe("MT3, the release-claim story", () => {
+  const text = JSON.stringify(storyById("MT3"));
+  it("labels every product claim as a Ping claim and never as measured", () => {
+    expect(text).toMatch(/UNVERIFIED on our tenant/);
+    expect(text).toMatch(/Challenge \(Ping claim\)/);
+    expect(text).toMatch(/Technical value \(Ping claim\)/);
+    expect(text).toMatch(/Business value \(Ping claim\)/);
+    expect(text).toMatch(/simulation/);
+  });
+  it("carries the section 10 lines for the gateway and the aggregate", () => {
+    expect(text).toMatch(/one shared token and every tool exposed to every caller/);
+    expect(text).toMatch(/one policy cap enforced twice/);
+    expect(text).toMatch(/new servers join by configuration, not project work/);
+  });
+  it("says the filtered-list scan covers one caller, uses cast tokens, and avoids the banned word", () => {
+    expect(text).toMatch(/clean for that caller only/);
+    expect(text).toMatch(/\{\{ada\}\}/);
+    expect(text).not.toMatch(/\bdoor\b/i);
+    expect(storyById("MT3").steps).toHaveLength(6);
   });
 });
 
