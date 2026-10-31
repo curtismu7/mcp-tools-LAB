@@ -17,7 +17,7 @@ export async function startApp({ env = {}, dir = tmpDir() } = {}) {
     const h = { ...headers };
     if (o && method !== 'GET') h.Origin = o;
     if (body !== undefined && !raw) h['Content-Type'] = 'application/json';
-    const res = await fetch(`${origin}${p}`, { method, headers: h, body: body === undefined ? undefined : raw ? body : JSON.stringify(body) });
+    const res = await fetch(`${origin}${p}`, { redirect: 'error', method, headers: h, body: body === undefined ? undefined : raw ? body : JSON.stringify(body) });
     const text = await res.text();
     let json = null;
     try { json = JSON.parse(text); } catch { /* not JSON */ }
