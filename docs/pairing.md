@@ -21,3 +21,7 @@ The two demos catch different things:
 ## With the Privilege demo: call control
 
 This tool does not control calls. Its confirm step protects one operator from a click they did not mean and from changed arguments; it is not an authorisation layer and a script on the same machine can pass it. Deciding which agent may call which tool, with which limits, is what the Privilege demo does on the wire. A scan finding never changes a server's data and never stops a call; a call to a flagged tool shows the finding next to the confirm dialog and leaves the decision to you.
+
+## With the Privilege demo: a simulated shape of the entitled listing (Ping release claim)
+
+The Privilege demo controls calls on the wire. The Entitled listing page in this app is a **simulation** of one thing Ping's 2026-11-02 release is said to add to that layer: per-caller discovery (a tool the caller may not use is not listed and is refused by name) and an aggregate policy cap enforced on the listing and again at the member hop. It is a Ping release claim, **UNVERIFIED on our tenant**: this app does not call a gateway and the SE gateway does not have the release. When the release is on our tenant, the lab tests are the plan for measuring it, and the claim label stays until they pass there. See [entitled-listing.md](entitled-listing.md).

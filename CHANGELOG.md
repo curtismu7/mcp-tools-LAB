@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Entitled listing and aggregate cap: a simulation of a Ping release claim (2026-11-02), UNVERIFIED on our tenant. `/api/gateway/*` routes, an Entitled listing page, a banner on every tab and in presenter mode, a third diagram run (with a phone layout), story MT3, content-pack terms and why-it-matters entries, a `filtered-listing` scan limit, tests with negative controls and a mutation runner (`npm run mutate`). Details: `docs/entitled-listing.md`.
+
 ## 0.1.0
 
 - Review fixes 1: the scanner criterion runs on every clone against a committed hostile-mcp snapshot (`scripts/capture-hostile-snapshot.mjs`), the live test is optional and says SKIPPED loudly; per-test timeouts and cleanup so a removed confirm gate fails fast; isolated `argsHash` tests; the rug-pull banner compares the scanned list with the current one; packaging checks use committed copies with recorded source commits; README counts and the shelf `composeFile` override.

@@ -1,0 +1,82 @@
+{
+  "id": "MT3",
+  "title": "{{ada}} sees only what {{ada}} may use",
+  "demos": ["D3", "D4"],
+  "paths": { "main": "Entitled listing", "alt": "Everything listed" },
+  "goal": "{{ada}} wants an agent to use {{vocab.server}} through a gateway, and {{sam}} wants each caller to see and use only the tools that caller is entitled to.",
+  "obstacle": "With one shared token and every tool listed to every caller, there is no attribution and no per-tool control, so security stalls the project. (Challenge, per Ping's deck: a Ping claim, UNVERIFIED on our tenant.)",
+  "control": "The Entitled listing page simulates what Ping's 2026-11-02 release is said to do: remove tools a caller may not use from the list, refuse them again by name, and cap an aggregate of servers with one policy. It is a simulation in this app. The release is not on our tenant.",
+  "say": "A tool you were never shown should also be a tool you cannot call. The release says so; this lab only shows the shape.",
+  "steps": [
+    {
+      "n": 1,
+      "title": "Read the label first",
+      "tell": "Every tab carries the banner: Ping release claim (2026-11-02), UNVERIFIED on our tenant. The page runs a simulation in this app, and says there is no live path until the release is on our tenant.",
+      "say": "Everything on this page is a claim we are showing, not something we measured.",
+      "why": "Challenge (Ping claim): one shared token and every tool exposed to every caller means no attribution and no per-tool control. Without the label, a simulation reads like a result.",
+      "alt": {
+        "tell": "If {{ada}} skips the banner, the page reads as a measurement of the product.",
+        "say": "A simulation without its label is a demo of what we wish were true."
+      }
+    },
+    {
+      "n": 2,
+      "title": "Same server, different callers",
+      "tell": "Open Entitled listing. Pick each caller in turn and read the count and the names off the list. They differ by caller, and the list never says how many tools were left out.",
+      "say": "Each caller gets a different list, and nobody is told what is missing.",
+      "why": "Technical value (Ping claim): per-user identity and per-tool policy on every call. Hiding tools from the list keeps a caller from learning what it may not use.",
+      "alt": {
+        "tell": "Without entitlement-aware discovery every caller would get the same list, with every tool in it.",
+        "say": "One list for everyone is the shared-token problem again."
+      }
+    },
+    {
+      "n": 3,
+      "title": "Call a tool you were not shown",
+      "tell": "Type the name of a tool that is not in the list and press Call. The refusal reads the same for a hidden tool and for one that does not exist. The demo trace says where it was stopped; a real gateway would show only the refusal.",
+      "say": "Hiding is not security unless the call by name is refused too.",
+      "why": "Technical value (Ping claim): the refusal on a direct call is the part that makes the hidden list mean something.",
+      "alt": {
+        "tell": "If only the list were filtered, anyone who guessed a tool name could still call it.",
+        "say": "A filtered list with an open call path is only a tidy list."
+      }
+    },
+    {
+      "n": 4,
+      "title": "Add the aggregate and its cap",
+      "tell": "Through the aggregate, member tools are named alias__tool. Find a tool the member lists when used directly but the aggregate does not: the cap removed it. Switch to One member directly to see the member's own rule apply.",
+      "say": "One policy caps every member, and the member keeps its own rules when used directly.",
+      "why": "Challenge (Ping claim): each agent-server pair needs its own connection, configuration and credential, so effort and attack surface grow with each pair. Technical value: one connection, one policy cap enforced twice, one audit trail across members. Business value: new servers join by configuration, not project work.",
+      "alt": {
+        "tell": "Switch to One member directly. The tool the cap hid is back, because only the member's own policy applies there.",
+        "say": "The cap belongs to the aggregate; it does not follow the tool around."
+      }
+    },
+    {
+      "n": 5,
+      "title": "Break a member",
+      "tell": "Untick Reachable for one member in the policy editor. The listing reports that member as unreachable instead of quietly showing fewer tools. A member that needs each caller's own sign-in is reported as needing it.",
+      "say": "A gap is reported, not hidden.",
+      "why": "A silent gap looks like no tools here. A reported gap tells the operator that something is down or that a caller has not signed in.",
+      "alt": {
+        "tell": "If the aggregate dropped the member without a word, {{sam}} would see a shorter list and no reason.",
+        "say": "A shorter list with no reason is how outages get blamed on the agent."
+      }
+    },
+    {
+      "n": 6,
+      "title": "Scan as each caller",
+      "tell": "Press Scan on the listing for one caller, then for another. The scan reads only the list that caller sees, and its notes and the Limits page say so. A tool hidden from this caller is never scanned.",
+      "say": "A clean scan of a filtered list is clean for that caller only.",
+      "why": "Business value (Ping claim): MCP integrations proceed under existing governance, faster. For the scanner, the cost is that a clean result no longer speaks for every caller.",
+      "alt": {
+        "tell": "If {{ada}} scans once and reports clean, {{sam}} may read that as clean for every caller.",
+        "say": "The scan covered one caller's view. Say whose."
+      }
+    }
+  ],
+  "proof": {
+    "main": "For one caller the aggregate list lacks a tool that the member lists directly, the call by name is refused with the same words as an unknown tool, and the scan notes say how many tools that caller sees.",
+    "alt": "A scan of one caller's filtered list reported clean, and a tool that caller never saw was never scanned."
+  }
+}

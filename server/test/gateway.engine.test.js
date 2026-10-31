@@ -122,6 +122,21 @@ test('row MCP Aggregate (negative control): the same tool through the member dir
   assert.ok(listMember(cfg, member(cfg, 'wiki'), 'operator').tools.some((t) => t.name === 'edit_page'));
 });
 
+test('direct use of a member: an unreachable member and a missing upstream sign-in are reported and refused there too', T, () => {
+  const down = build((w) => { w.members[0].reachable = false; });
+  assert.deepEqual(listMember(down, member(down, 'crm'), 'operator').tools, []);
+  assert.equal(callMember(down, member(down, 'crm'), 'operator', 'find_customer').trace[0].layer, 'unreachable');
+  const cfg = build();
+  const billing = member(cfg, 'billing');
+  const guest = listMember(cfg, billing, 'guest');
+  assert.deepEqual(guest.members, [{ alias: 'bill', status: 'needs-upstream-sign-in' }]);
+  assert.deepEqual(guest.tools, [], 'the member policy lists one tool for the guest, but the guest has not signed in');
+  assert.equal(callMember(cfg, billing, 'guest', 'get_invoice').trace[0].layer, 'upstream-sign-in');
+  const linked = build((w) => w.members[1].linkedCallers.push('guest'));
+  assert.deepEqual(names(listMember(linked, member(linked, 'billing'), 'guest')), ['get_invoice']);
+  assert.equal(callMember(linked, member(linked, 'billing'), 'guest', 'get_invoice').ok, true);
+});
+
 test('row MCP Catalog (entitlement part): a tool the caller is not entitled to is removed from tools/list AND refused by name', T, () => {
   const cfg = build();
   for (const [caller, hidden] of [['analyst', 'crm__update_customer'], ['analyst', 'bill__refund_payment'], ['guest', 'crm__find_customer'], ['guest', 'bill__get_invoice']]) {
