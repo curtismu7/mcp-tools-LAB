@@ -6,9 +6,12 @@ import Offline from "./pages/Offline.jsx";
 import Stories from "./pages/Stories.jsx";
 import Diagram from "./pages/Diagram.jsx";
 import Limits from "./pages/Limits.jsx";
+import Gateway from "./pages/Gateway.jsx";
+import ReleaseBanner from "./components/ReleaseBanner.jsx";
+import { useGateway } from "./lib/gateway.js";
 import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMode.jsx";
 
-const PAGES = [["connect", "Connect"], ["server", "Server"], ["offline", "Scan a snapshot"], ["stories", "Stories"], ["diagram", "How it fits"], ["limits", "Limits", true]];
+const PAGES = [["connect", "Connect"], ["server", "Server"], ["offline", "Scan a snapshot"], ["gateway", "Entitled listing"], ["stories", "Stories"], ["diagram", "How it fits"], ["limits", "Limits", true]];
 const store = {
   read(k) { try { return localStorage.getItem(k); } catch { return null; } },
   write(k, v) { try { localStorage.setItem(k, v); } catch { /* storage may be blocked */ } },
@@ -20,6 +23,7 @@ function Shell() {
   const [config, setConfig] = useState(null);
   const [active, setActive] = useState(null); // the opened connection (public view: a token only ever shows "set")
   const [scans, setScans] = useState({}); // connection id -> {report, listed}; this session only
+  const gw = useGateway(); // the simulated gateway: lives here so one Reset can restore it with the diagram
 
   useEffect(() => { get("/api/config").then((r) => setConfig(r.data)); }, []);
   useEffect(() => {
@@ -50,13 +54,15 @@ function Shell() {
         </label>
       </header>
       <PresentBar />
+      <ReleaseBanner config={config} />
       {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
       <main className="page" id="main" tabIndex={-1}>
         {page === "connect" && <Connect config={config} activeId={active?.id} onOpen={open} onRemoved={clear} />}
         {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} />}
         {page === "offline" && <Offline config={config} />}
+        {page === "gateway" && <Gateway gw={gw} />}
         {page === "stories" && <Stories />}
-        {page === "diagram" && <Diagram theme={theme} onNavigate={setPage} />}
+        {page === "diagram" && <Diagram theme={theme} onNavigate={setPage} gw={gw} />}
         {page === "limits" && <Limits />}
       </main>
     </>

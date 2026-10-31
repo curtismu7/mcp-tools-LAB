@@ -1,0 +1,23 @@
+/* Entitled listing and aggregate cap. Colours come from the theme tokens in app.css; none is written here. */
+.gw__tools, .gw__members, .gw__trace { margin: 0.25rem 0 0.75rem; padding-left: 1.2rem; }
+.gw__tools li, .gw__members li { overflow-wrap: anywhere; margin: 0.15rem 0; }
+.gw__members li[data-state="unreachable"], .gw__members li[data-state="needs-upstream-sign-in"] { border-left: 4px solid var(--hold); padding-left: 0.5rem; list-style: none; margin-left: -1rem; }
+.gw__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem 1rem; margin: 0.25rem 0 0.5rem; }
+.gw__grow { flex: 1 1 14rem; }
+.gw__field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; color: var(--muted); min-width: 0; }
+.gw__hint { color: var(--deny); font-size: 0.8rem; }
+.gw__check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; color: var(--text); }
+.gw__check input { width: auto; }
+.gw__result { margin-top: 0.75rem; padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid var(--border); border-left-width: 6px; background: var(--bg); }
+.gw__result[data-state="allowed"] { border-left-color: var(--ok); }
+.gw__result[data-state="refused"] { border-left-color: var(--deny); }
+.gw__result p { margin: 0.2rem 0; overflow-wrap: anywhere; }
+.gw__member { margin: 0.75rem 0; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.gw__member legend { padding: 0 0.4rem; font-weight: 600; }
+.gw__scroll { overflow-x: auto; max-width: 100%; }
+.gw__table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.gw__table th, .gw__table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.gw__table td input[type="checkbox"] { width: auto; min-width: 1.1rem; min-height: 1.1rem; }
+.gw__table tr[data-state="hidden"] td:nth-child(2) { color: var(--deny); font-weight: 700; }
+.gw__caption { text-align: left; font-size: 0.85rem; color: var(--muted); padding: 0.25rem 0; }
+
