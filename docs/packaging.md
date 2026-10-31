@@ -7,7 +7,7 @@ HOST_PORT=4820 docker compose up --build -d     # http://127.0.0.1:4820 ; HOST_P
 docker compose down
 ```
 
-- The image is `node:22-alpine`, runs as the non-root `node` user, keeps saved connections in the `mcp-tools-data` volume at `/data` (mode 700), and has a health check on `GET /api/health`.
+- The image is `node:26-alpine`, runs as the non-root `node` user, keeps saved connections in the `mcp-tools-data` volume at `/data` (mode 700), and has a health check on `GET /api/health`.
 - The compose file publishes `127.0.0.1:${HOST_PORT}:4810` only. Inside the container the server listens on all interfaces (`MCPTOOLS_BIND=0.0.0.0` in the Dockerfile) so the published port reaches it; the Host check still accepts only loopback names. **Do not publish it on another address.** `server/test/packaging.test.js` fails if a `ports:` entry does not start with `127.0.0.1:`.
 - The root filesystem is read-only, `/tmp` is a tmpfs, all capabilities are dropped and `no-new-privileges` is on.
 - **stdio connections launch processes inside the container**, not on your machine: the command you type runs with the container's filesystem and network, as the `node` user, and only what the minimal Alpine and Node image contains is there to run (`node` is; `npx` packages would need network access from the container). To scan a stdio server on your machine, run the app on the host (`npm start`). A server on your machine that listens only on loopback is not reachable from the container.

@@ -17,7 +17,7 @@ This tool connects to servers the operator names, so each rule below has a test.
 | Everything from a server renders as inert text; strict CSP and hardening headers | `web/src/lib/Untrusted.jsx`, `app.js` | web `untrusted.test.jsx`; `api.test.js` "responses carry the hardening headers that keep untrusted text inert"; web `server.test.jsx` "lists tools and schemas as inert text" |
 | Hostile input (huge, deeply nested, cyclic-looking JSON) is reported, not a crash | `scanner/engine.js` | `scanner.test.js` "deep nesting ends in a scan-truncated finding", "a huge schema stops at the node budget", "a cyclic object ... is detected", "odd shapes do not throw"; `api.test.js` "offline scan ... hostile shapes are handled" |
 | Unicode tricks (zero-width, bidi, tag characters, homoglyphs) are reported with the characters made visible | `scanner/unicode.js` | `scanner.test.js` "invisible characters are reported with the characters made visible", "bidi controls are high ...", "homoglyphs ..."; web `untrusted.test.jsx`; the e2e run checks `[U+200B]` and `[U+202E]` on screen |
-| The container publishes its port on `127.0.0.1` only, runs as non-root | `docker-compose.yml`, `Dockerfile` | `packaging.test.js` "docker-compose.yml publishes only on 127.0.0.1", "the image is Node 22 and runs as a non-root user" |
+| The container publishes its port on `127.0.0.1` only, runs as non-root | `docker-compose.yml`, `Dockerfile` | `packaging.test.js` "docker-compose.yml publishes only on 127.0.0.1", "the image is Node 26 and runs as a non-root user" |
 | The page makes no request outside its own origin | `web/` | the e2e run (not CI) fails on any request outside the app origin |
 
 Known edges, stated plainly:
