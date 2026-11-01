@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Background, Controls, Handle, MarkerType, Position, ReactFlow, applyNodeChanges } from "@xyflow/react";
+import { Background, BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow, applyNodeChanges, getBezierPath, useStore } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import WirePanel from "../components/WirePanel.jsx";
 import { WIRE } from "../lib/wire.js";
 import { post } from "../lib/api.js";
+import { placeLabels } from "../lib/labelSpot.js";
 import { BANNER } from "../lib/gateway.js";
 import "./Diagram.css";
 
@@ -94,7 +95,7 @@ export const SCENARIOS = {
     ],
   },
 };
-const VIEWS = {
+export const VIEWS = {
   main: { nodes: START, edges: EDGES, narrow: NARROW, narrowEdges: NARROW_EDGES, label: "Diagram: MCP server, connection, scan, findings, your decision, tools/call and the Privilege demo. Boxes can be dragged." },
   gateway: { nodes: GW_START, edges: GW_EDGES, narrow: GW_NARROW, narrowEdges: GW_NARROW_EDGES, label: "Diagram: caller, gateway entitlement filter, aggregate policy cap, member hop, member server and an unreachable member. Boxes can be dragged." },
 };
@@ -119,7 +120,7 @@ const SPEEDS = [["0.5", "0.5x"], ["1", "1x"], ["2", "2x"], ["4", "4x"]];
 const BASE_MS = 1600;
 
 // Where each handle sits. A box renders only the handles an edge uses, so no stray dots hang on it.
-const HANDLES = {
+export const HANDLES = {
   l: ["target", Position.Left], b: ["target", Position.Bottom], tt: ["target", Position.Top], rt: ["target", Position.Right],
   r: ["source", Position.Right], t: ["source", Position.Top], bb: ["source", Position.Bottom], ls: ["source", Position.Left],
 };
@@ -133,6 +134,27 @@ function Box({ data }) {
   );
 }
 const nodeTypes = { box: Box };
+
+// Every box's place and size, and every edge's ends and label, as one string each, so an edge redraws only when something
+// that matters to a label has moved.
+const boxesKey = (s) => JSON.stringify([...s.nodeLookup.values()].map((n) => [n.id, n.internals.positionAbsolute.x, n.internals.positionAbsolute.y, n.measured.width ?? 0, n.measured.height ?? 0]));
+const edgesKey = (s) => JSON.stringify(s.edges.map((e) => [e.id, e.source, e.target, e.sourceHandle, e.targetHandle, e.label]));
+const positionOf = (handle) => HANDLES[handle][1];
+// A bezier edge whose label moves off any box and off the other labels. Dragging a box right up to its neighbour closes the
+// gap the label sits in; the label then takes the nearest clear spot instead of landing on a box.
+function LabelEdge({ id, label, markerEnd, interactionWidth, ...p }) {
+  const nodesKey = useStore(boxesKey);
+  const edgeKey = useStore(edgesKey);
+  const [path, midX, midY] = getBezierPath(p);
+  const spot = useMemo(() => {
+    const nodes = JSON.parse(nodesKey).map(([nid, x, y, w, h]) => ({ id: nid, x, y, w, h }));
+    const edges = JSON.parse(edgeKey).map(([eid, source, target, sourceHandle, targetHandle, text]) => ({ id: eid, source, target, sourceHandle, targetHandle, label: text }));
+    return placeLabels(nodes, edges, positionOf)[id];
+  }, [nodesKey, edgeKey, id]);
+  return <BaseEdge id={id} path={path} labelX={spot?.x ?? midX} labelY={spot?.y ?? midY} label={label} markerEnd={markerEnd} interactionWidth={interactionWidth} />;
+}
+// The type name becomes a CSS class (react-flow__edge-<type>); "label" would collide with the label classes.
+const edgeTypes = { clear: LabelEdge };
 
 // Phone width, from the same 600px breakpoint as the CSS. jsdom has no matchMedia, so tests get the wide layout.
 function useNarrow() {
@@ -202,7 +224,7 @@ export default function Diagram({ theme = "system", onNavigate, gw }) {
     const used = (id) => [...new Set(edgeDefs.flatMap((e) => [e.source === id && e.sourceHandle, e.target === id && e.targetHandle]).filter(Boolean))];
     return moved.map((n) => ({ ...n, type: "box", data: { ...n.data, narrow, handles: used(n.id), on: !!cur?.nodes.includes(n.id), dim: !!cur && !cur.nodes.includes(n.id) } }));
   }, [moved, cur, edgeDefs, narrow]);
-  const edges = useMemo(() => edgeDefs.map(({ short: _short, ...e }) => ({ ...e, animated: !!cur?.edges.includes(e.id), className: cur?.edges.includes(e.id) ? "edge-on" : "", markerEnd: { type: MarkerType.ArrowClosed } })), [cur, edgeDefs]);
+  const edges = useMemo(() => edgeDefs.map(({ short: _short, ...e }) => ({ ...e, type: "clear", animated: !!cur?.edges.includes(e.id), className: cur?.edges.includes(e.id) ? "edge-on" : "", markerEnd: { type: MarkerType.ArrowClosed } })), [cur, edgeDefs]);
   // On a phone the picture is shown whole at full size and the page scrolls past it; it is not a pan-and-zoom area.
   const height = narrow ? Math.max(...start.map((n) => n.position.y)) + 130 : undefined;
 
@@ -217,7 +239,7 @@ export default function Diagram({ theme = "system", onNavigate, gw }) {
         <button type="button" className="btn" onClick={reset}>Reset</button>
       </div>
       <div className="flow-wrap" role="group" aria-label={view.label} data-layout={narrow ? "narrow" : "wide"} style={height ? { height } : undefined}>
-        <ReactFlow key={`${SCENARIOS[scenario].view}-${narrow}-${fit}`} nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} colorMode={theme}
+        <ReactFlow key={`${SCENARIOS[scenario].view}-${narrow}-${fit}`} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChange} colorMode={theme}
           fitView fitViewOptions={{ padding: narrow ? 0.04 : 0.12 }} nodesConnectable={false} onNodeClick={(_, n) => setSelected(n.id)} proOptions={{ hideAttribution: true }} minZoom={0.2}
           panOnDrag={!narrow} zoomOnScroll={!narrow} zoomOnPinch={!narrow} zoomOnDoubleClick={!narrow} preventScrolling={!narrow}>
           <Background />

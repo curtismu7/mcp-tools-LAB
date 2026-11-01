@@ -5,7 +5,7 @@
 // Every mutant names the exact text it replaces and how many times that text occurs, so a mutant can never silently
 // do nothing (a wrong count is an error, not a pass).
 //
-//   node scripts/mutate-release-feature.mjs            all mutants, one at a time (about ten minutes)
+//   node scripts/mutate-release-feature.mjs            all mutants, one at a time (about twenty minutes)
 //   node scripts/mutate-release-feature.mjs M05 W03    only these
 //
 // Run it with the test env pointing at no settings file:  STANDALONE_ENV=/nonexistent node scripts/mutate-release-feature.mjs
@@ -23,12 +23,35 @@ const SERVER = {
     ['credentials', ['--test', '--test-timeout=120000', 'test/gateway.credentials.test.js']],
   ],
 };
+// Faster runners for mutants that only the config or credential tests can notice (the first failing step ends the run).
+const CFG = { cwd: path.join(ROOT, 'server'), steps: [['config', ['--test', '--test-timeout=60000', 'test/gateway.config.test.js']], ['api', ['--test', '--test-timeout=60000', 'test/gateway.api.test.js']]] };
+const CREDS = { cwd: path.join(ROOT, 'server'), steps: [['credentials', ['--test', '--test-timeout=120000', 'test/gateway.credentials.test.js']]] };
+const API = { cwd: path.join(ROOT, 'server'), steps: [['api', ['--test', '--test-timeout=60000', 'test/gateway.api.test.js']]] };
+const LABELS = (file) => ({ cwd: path.join(ROOT, 'web'), steps: [['labels', null, ['npx', 'vitest', 'run', file]]] });
+// The real browser: build the mutated page into a temp folder (web/dist is never touched), then drag every box.
+const BROWSER = { cwd: ROOT, steps: [['browser', null, ['sh', '-c', 'd=$(mktemp -d) && (cd web && npx vite build --outDir "$d" --emptyOutDir >/dev/null 2>&1) && WEB_DIST="$d" node scripts/diagram-drag-check.mjs; s=$?; rm -rf "$d"; exit $s']]] };
 const WEB = (file) => ({ cwd: path.join(ROOT, 'web'), steps: [['web', null, ['npx', 'vitest', 'run', file]]] });
 const GW_PAGE = 'src/pages/__tests__/gateway.test.jsx';
 const GW_LIB = 'src/lib/__tests__/gateway.test.js';
 const SIM = 'server/src/gateway/sim.js';
 const CONFIG = 'server/src/gateway/config.js';
 const ROUTES = 'server/src/gateway/routes.js';
+
+// A credential rule is one line of the CREDENTIAL list in config.js: ['name', /regex/]. These helpers read the line from the
+// source, so a mutant never repeats a regex by hand.
+const CONFIG_TEXT = fs.readFileSync(path.join(ROOT, CONFIG), 'utf8');
+const ruleLine = (name) => {
+  const line = CONFIG_TEXT.split('\n').find((l) => l.startsWith(`  ['${name}', `));
+  if (!line) throw new Error(`no credential rule named ${name}`);
+  return `${line}\n`;
+};
+const dropRule = (id, name, what) => [id, what, CONFIG, ruleLine(name), 1, 0, '', CREDS];
+const inRule = (id, name, what, from, to) => {
+  const line = ruleLine(name);
+  if (!line.includes(from)) throw new Error(`${id}: ${from} is not in the ${name} rule`);
+  return [id, what, CONFIG, line, 1, 0, line.replace(from, () => to), CREDS];
+};
+const swap = (id, what, file, from, to, runner, count = 1) => [id, what, file, from, count, 0, to, runner];
 
 // [id, field or behaviour, file, exact text, occurrences in the file, which one (0-based), replacement, runner]
 const AGG_REACH = "  if (!m.reachable) return 'unreachable';\n";
@@ -53,7 +76,7 @@ export const MUTANTS = [
   ['M15', 'a direct member call ignores an unreachable member', SIM, AGG_REACH, 3, 1, '', SERVER],
   ['M16', 'the refusal words differ by layer (leaks existence)', SIM, "const refused = (trace) => ({ ok: false, ...NOT_AVAILABLE, trace });", 1, 0, "const refused = (trace) => ({ ok: false, ...NOT_AVAILABLE, message: `${REFUSAL} ${trace[0].layer}`, trace });", SERVER],
   ['M17', 'the listing reports a count of hidden tools (leak)', SIM, 'return { tools, members: cfg.members.map((m) => ({ alias: m.alias, status: status(m, caller) })) };', 1, 0, 'return { hidden: 1, tools, members: cfg.members.map((m) => ({ alias: m.alias, status: status(m, caller) })) };', SERVER],
-  ['M18', 'a typed credential is no longer refused', CONFIG, "export const credentialLike = (s) => typeof s === 'string' && CREDENTIAL.some((re) => re.test(s));", 1, 0, 'export const credentialLike = () => false;', SERVER],
+  ['M18', 'a typed credential is no longer refused', CONFIG, 'export const credentialLike = (s) => credentialRules(s).length > 0;', 1, 0, 'export const credentialLike = () => false;', SERVER],
   ['M19', 'unknown config fields are accepted', CONFIG, "if (!allowed.includes(k)) throw new ConfigError(where, 'unexpected field');", 1, 0, 'void k;', SERVER],
   ['M20', 'a duplicate alias is accepted', CONFIG, "if (!nameOk(m.alias, ALIAS) || aliases.has(m.alias))", 1, 0, 'if (!nameOk(m.alias, ALIAS))', SERVER],
   ['M21', 'a policy naming a tool the member lacks is accepted', CONFIG, "if (!toolNames.has(n)) throw new ConfigError(where, 'names a tool the member does not have');", 1, 0, 'void n;', SERVER],
@@ -66,11 +89,32 @@ export const MUTANTS = [
   ['M28', 'a swagger-tagged name is retagged as a deck claim (provenance)', 'server/src/gateway/provenance.js', "{ name: 'ToolFilter', tag: 'swagger'", 1, 0, "{ name: 'ToolFilter', tag: 'deck'", SERVER],
   ['M29', 'the aggregate policy cap is tagged as a swagger name (invented field)', 'server/src/gateway/provenance.js', "{ name: 'aggregate policy cap', tag: 'deck'", 1, 0, "{ name: 'aggregate policy cap', tag: 'swagger'", SERVER],
   // Credential detection, one rule or one place at a time (added in the fix pass after three extra mutants survived).
-  ['C01', 'the Bearer rule is removed from the credential check', CONFIG, "  /\\bBearer\\s+\\S{8,}/i,\n", 1, 0, '', SERVER],
-  ['C02', 'the key-prefix rule is removed from the credential check', CONFIG, "  /\\b(?:sk|pk|rk|ghp|gho|ghs|xox[abprs])[-_][A-Za-z0-9_-]{12,}/,\n", 1, 0, '', SERVER],
-  ['C03', 'the AKIA rule is removed from the credential check', CONFIG, "  /\\bAKIA[0-9A-Z]{16}\\b/,\n", 1, 0, '', SERVER],
-  ['C04', 'the long mixed-case token rule is removed from the credential check', CONFIG, "  /(?=[A-Za-z0-9+/_-]*[a-z])(?=[A-Za-z0-9+/_-]*[A-Z])(?=[A-Za-z0-9+/_-]*\\d)[A-Za-z0-9+/_-]{32,}/,\n", 1, 0, '', SERVER],
-  ['C05', 'the JWT rule is removed from the credential check', CONFIG, "  /\\beyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}(?:\\.[A-Za-z0-9_-]*)?/,\n", 1, 0, '', SERVER],
+  dropRule('C01', 'bearer', 'the Bearer rule is removed from the credential check'),
+  dropRule('C02', 'key-prefix', 'the key-prefix rule is removed from the credential check'),
+  dropRule('C03', 'akia', 'the AKIA rule is removed from the credential check'),
+  dropRule('C04', 'mixed-token', 'the long mixed-case token rule is removed from the credential check'),
+  dropRule('C05', 'jwt', 'the JWT rule is removed from the credential check'),
+  dropRule('C18', 'hex', 'the lower-case hex rule is removed from the credential check'),
+  dropRule('C19', 'basic', 'the Basic-auth rule is removed from the credential check'),
+  dropRule('C20', 'assignment', 'the password= / secret= / api_key= rule is removed from the credential check'),
+  inRule('C21', 'key-prefix', 'the key-prefix rule starts with a word boundary again (x_sk-... and tok_ghp_... slip through)', '(?<![A-Za-z0-9])', '\\b'),
+  inRule('C22', 'key-prefix', 'the ghp prefix is dropped', 'ghp|', ''),
+  inRule('C23', 'key-prefix', 'the xox (Slack) prefixes are dropped', '|xox[abprs]', ''),
+  inRule('C24', 'key-prefix', 'the underscore separator is dropped (sk_live_...)', '[-_]', '-'),
+  inRule('C25', 'key-prefix', 'the key-prefix minimum length drops to 1', '{12,}', '{1,}'),
+  inRule('C26', 'bearer', 'the Bearer rule becomes case-sensitive', '/i]', '/]'),
+  inRule('C27', 'bearer', 'Bearer glued with an underscore is no longer matched', '[\\s_]+', '\\s+'),
+  inRule('C28', 'bearer', 'the Bearer minimum length drops to 1', '{8,}', '{1,}'),
+  inRule('C29', 'jwt', 'a JWT with an empty signature is no longer matched', '(?:\\.[A-Za-z0-9_-]*)?', '\\.[A-Za-z0-9_-]+'),
+  inRule('C30', 'akia', 'the AKIA rule loses its trailing boundary', '(?![A-Za-z0-9])', ''),
+  inRule('C31', 'hex', 'the hex rule needs 33 characters', '{32,}', '{33,}'),
+  inRule('C32', 'basic', 'the Basic rule loses its padding branch', '|[A-Za-z0-9+/]{12,}={1,2}', ''),
+  inRule('C33', 'basic', 'the Basic rule matches plain words such as "Basic Authentication"', '(?=[A-Za-z0-9+/]*(?:[0-9+/]|[a-z][A-Z]))', ''),
+  inRule('C34', 'assignment', 'the api_key assignment is dropped', '|api[-_]?key', ''),
+  inRule('C35', 'assignment', 'the secret assignment is dropped', '|secret', ''),
+  inRule('C36', 'assignment', 'the assignment value minimum drops to 1', '{4,}', '{1,}'),
+  swap('C37', 'the text is not normalised with NFKC before the credential test', CONFIG, "const clean = (s) => s.normalize('NFKC').replace(/\\p{Cf}/gu, '');", "const clean = (s) => s.replace(/\\p{Cf}/gu, '');", CREDS),
+  swap('C38', 'invisible format characters are not stripped before the credential test', CONFIG, "const clean = (s) => s.normalize('NFKC').replace(/\\p{Cf}/gu, '');", "const clean = (s) => s.normalize('NFKC');", CREDS),
   ['C06', 'names (tool, member, alias, caller id) are no longer checked for a credential', CONFIG, 're.test(n) && !credentialLike(n);', 1, 0, 're.test(n);', SERVER],
   ['C07', 'descriptions and labels are no longer checked for a credential', CONFIG, "  if (credentialLike(v)) throw new ConfigError(where, 'looks like a credential; this lab takes none');\n  return v;", 1, 0, '  return v;', SERVER],
   ['C08', 'call arguments are no longer checked for a credential', ROUTES, ' || argsLookLikeCredentials(req.body.arguments)', 1, 0, '', SERVER],
@@ -83,6 +127,52 @@ export const MUTANTS = [
   ['C15', 'the inputSchema value-count bound is lifted', CONFIG, 'nodes > BOUNDS.schemaNodes || depth > BOUNDS.schemaDepth', 1, 0, 'depth > BOUNDS.schemaDepth', SERVER],
   ['C16', 'the inputSchema string-length bound is lifted', CONFIG, 'if (v.length > BOUNDS.schemaText)', 1, 0, 'if (false)', SERVER],
   ['C17', 'the inputSchema key-length bound is lifted', CONFIG, 'if (k.length > BOUNDS.schemaKey)', 1, 0, 'if (false)', SERVER],
+  // Validation guards, one change each (added in the fix pass: every limit and every refusal has a test that names it).
+  swap('K01', 'a duplicate tool name is accepted', CONFIG, "if (!nameOk(t.name, TOOL_NAME) || toolNames.has(t.name))", 'if (!nameOk(t.name, TOOL_NAME))', CFG),
+  swap('K02', 'a duplicate caller id is accepted', CONFIG, "if (callerIds.has(c.id)) throw new ConfigError(`${at}.id`, 'is a duplicate');", 'void callerIds;', CFG),
+  swap('K03', 'a duplicate member id is accepted', CONFIG, 'if (!nameOk(m.id, ID) || memberIds.has(m.id))', 'if (!nameOk(m.id, ID))', CFG),
+  swap('K04', 'a duplicate inside a name list is accepted', CONFIG, "if (out.has(n)) throw new ConfigError(where, 'has a duplicate');", 'void out;', CFG),
+  swap('K05', 'an alias may hold an underscore', CONFIG, 'const ALIAS = /^[a-z][a-z0-9-]{0,15}$/;', 'const ALIAS = /^[a-z][a-z0-9_-]{0,15}$/;', CFG),
+  swap('K06', 'a caller may appear twice in a grant list', CONFIG, "if (out.has(g.caller)) throw new ConfigError(at, 'caller appears twice');", 'void out;', CFG),
+  swap('K07', 'a config with no callers is accepted', CONFIG, "if (!callers.length) throw new ConfigError('callers', 'needs at least one caller');", 'void callers;', CFG),
+  swap('K08', 'a config with no members is accepted', CONFIG, "if (!members.length) throw new ConfigError('members', 'needs at least one member');", 'void members;', CFG),
+  swap('K09', 'an unknown top-level config field is accepted', CONFIG, "only(raw, ['schema', 'callers', 'members', 'cap'], 'config');\n", '', CFG),
+  swap('K10', 'an unknown caller field is accepted', CONFIG, "    only(c, ['id', 'label'], at);\n", '', CFG),
+  swap('K11', 'an unknown member field is accepted', CONFIG, "    only(m, ['id', 'alias', 'reachable', 'upstream', 'linkedCallers', 'toolFilter', 'tools', 'policy'], at);\n", '', CFG),
+  swap('K12', 'an unknown tool field is accepted', CONFIG, "      only(t, ['name', 'description', 'inputSchema'], tt);\n", '', CFG),
+  swap('K13', 'an unknown grant field is accepted', CONFIG, "    only(g, ['caller', 'tools'], at);\n", '', CFG),
+  swap('K14', 'the callers bound is 9', CONFIG, 'callers: 8,', 'callers: 9,', CFG),
+  swap('K15', 'the members bound is 7', CONFIG, 'members: 6,', 'members: 7,', CFG),
+  swap('K16', 'the tools-per-member bound is 41', CONFIG, 'tools: 40,', 'tools: 41,', CFG),
+  swap('K17', 'the name-list bound is 401', CONFIG, 'listed: 400,', 'listed: 401,', CFG),
+  swap('K18', 'the inputSchema value-count bound is 401', CONFIG, 'schemaNodes: 400,', 'schemaNodes: 401,', CFG),
+  swap('K19', 'the inputSchema depth bound is 9', CONFIG, 'schemaDepth: 8,', 'schemaDepth: 9,', CFG),
+  swap('K20', 'the inputSchema string bound is 1001', CONFIG, 'schemaText: 1000,', 'schemaText: 1001,', CFG),
+  swap('K21', 'the inputSchema key bound is 101', CONFIG, 'schemaKey: 100 }', 'schemaKey: 101 }', CFG),
+  swap('K22', 'the caller label cap is 41', CONFIG, 'text(c.label, `${at}.label`, 40)', 'text(c.label, `${at}.label`, 41)', CFG),
+  swap('K23', 'the description cap is 1001', CONFIG, "`${tt}.description`, 1000)", "`${tt}.description`, 1001)", CFG),
+  swap('K24', 'the inputSchema JSON size cap is 4001', CONFIG, '.length > 4000)', '.length > 4001)', CFG),
+  swap('K25', 'the id length cap is 25', CONFIG, 'const ID = /^[a-z][a-z0-9-]{0,23}$/;', 'const ID = /^[a-z][a-z0-9-]{0,24}$/;', CFG),
+  swap('K26', 'the alias length cap is 17', CONFIG, 'const ALIAS = /^[a-z][a-z0-9-]{0,15}$/;', 'const ALIAS = /^[a-z][a-z0-9-]{0,16}$/;', CFG),
+  swap('K27', 'the tool name length cap is 65', CONFIG, 'export const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/;', 'export const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_.-]{0,64}$/;', CFG),
+  swap('K28', 'the inputSchema JSON size cap is removed', CONFIG, "if (t.inputSchema !== undefined && JSON.stringify(t.inputSchema).length > 4000) throw new ConfigError(`${tt}.inputSchema`, 'is too large');", 'void tt;', CFG),
+  swap('R01', 'the call-argument value budget is 201', ROUTES, 'budget = { n: 200 }', 'budget = { n: 201 }', API),
+  swap('R02', 'the call-argument budget is off by one', ROUTES, 'budget.n-- <= 0', 'budget.n-- < 0', API),
+  swap('R03', 'the call-argument depth bound is 5', ROUTES, 'depth > 4', 'depth > 5', API),
+  swap('R04', 'the call-argument string bound is 2001', ROUTES, 'v.length > 2000', 'v.length > 2001', API),
+  swap('R05', 'the call-argument key bound is 101', ROUTES, 'k.length > 100', 'k.length > 101', API),
+  swap('R06', 'an unknown tool in the direct view gets a different refusal body', SIM, "if (!t) return refused([{ stage: 'member', layer: 'unknown', decision: 'refused' }]);", "if (!t) return { ok: false, error: 'unknown_tool', message: 'No such tool on this member.', trace: [{ stage: 'member', layer: 'unknown', decision: 'refused' }] };", API),
+  swap('R07', 'an unknown tool through the aggregate gets a different refusal body', SIM, "if (!hit) return refused([{ stage: 'entry', layer: 'unknown', decision: 'refused' }]);", "if (!hit) return { ok: false, error: 'unknown_tool', message: REFUSAL, trace: [{ stage: 'entry', layer: 'unknown', decision: 'refused' }] };", API),
+  // Diagram edge labels: the geometry in a unit test, the wiring in the real browser.
+  swap('L01', 'labels are not moved off the boxes by default', 'web/src/lib/labelSpot.js', 'avoid = true)', 'avoid = false)', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('L02', 'a label stays on the middle of its edge even when a box is there', 'web/src/lib/labelSpot.js', 'if (free(mid.x, mid.y)) return mid;', 'return mid;', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('L03', 'a label does not avoid the labels placed before it', 'web/src/lib/labelSpot.js', '[...nodes, ...placed]', '[...nodes]', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('L04', 'a label keeps no air around it', 'web/src/lib/labelSpot.js', 'const MARGIN = 4;', 'const MARGIN = 0;', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('L05', 'the search for a clear spot gives up too soon', 'web/src/lib/labelSpot.js', 'const REACH = 150;', 'const REACH = 100;', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('L06', 'a tie between above and below goes below', 'web/src/lib/labelSpot.js', '(dy > 0 ? 0.5 : 0)', '(dy > 0 ? -0.5 : 0)', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('L07', 'a label is not as wide as its text', 'web/src/lib/labelSpot.js', 'String(text ?? "").length * 7 + 14', 'String(text ?? "").length * 1 + 2', LABELS('src/lib/__tests__/labelSpot.test.js')),
+  swap('B01', 'the diagram edges stop using the clear-label edge type', 'web/src/pages/Diagram.jsx', 'type: "clear", ', '', BROWSER),
+  swap('B02', 'the clear-label edge ignores the spot it computed', 'web/src/pages/Diagram.jsx', 'labelX={spot?.x ?? midX} labelY={spot?.y ?? midY}', 'labelX={midX} labelY={midY}', BROWSER),
   ['W01', 'the banner is removed from every tab', 'web/src/App.jsx', '      <ReleaseBanner config={config} />\n', 1, 0, '', WEB(GW_PAGE)],
   ['W02', 'the banner disappears in presenter mode', 'web/src/components/ReleaseBanner.jsx', 'export default function ReleaseBanner({ config }) {', 1, 0, 'export default function ReleaseBanner({ config }) {\n  if (document.documentElement.dataset.present === "1") return null;', WEB(GW_PAGE)],
   ['W03', 'Reset no longer restores the gateway state', 'web/src/lib/gateway.js', 'reset: load,', 1, 0, 'reset: () => {},', WEB(GW_PAGE)],
