@@ -4,7 +4,7 @@
 // No object is ever indexed by a sender-chosen key: names go into Maps and Sets, and callers appear as array items.
 import { SCHEMA } from './fixture.js';
 
-export const BOUNDS = { callers: 8, members: 6, tools: 40, listed: 400, text: 300 };
+export const BOUNDS = { callers: 8, members: 6, tools: 40, listed: 400, text: 300, schemaDepth: 8, schemaNodes: 400, schemaText: 1000, schemaKey: 100 };
 const ID = /^[a-z][a-z0-9-]{0,23}$/;
 const ALIAS = /^[a-z][a-z0-9-]{0,15}$/; // no underscore, so alias__tool splits at the first double underscore
 export const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/;
@@ -34,6 +34,29 @@ const text = (v, where, max = BOUNDS.text) => {
   return v;
 };
 export const nameOk = (n, re) => typeof n === 'string' && re.test(n) && !credentialLike(n);
+// A tool inputSchema is typed by the sender and comes back in list, audit and scan, so it gets the same credential check as
+// every other field: every string value and every key, at any depth. The walk is bounded (depth, count, length) so a
+// hostile schema is refused cleanly. It only reads own enumerable keys and never indexes an object by a typed key.
+function schemaText(root, where) {
+  let nodes = 0;
+  const walk = (v, depth) => {
+    nodes += 1;
+    if (nodes > BOUNDS.schemaNodes || depth > BOUNDS.schemaDepth) throw new ConfigError(where, 'is too large or too deep');
+    if (typeof v === 'string') {
+      if (v.length > BOUNDS.schemaText) throw new ConfigError(where, 'has text that is too long');
+      if (credentialLike(v)) throw new ConfigError(where, 'looks like a credential; this lab takes none');
+    } else if (Array.isArray(v)) {
+      for (const x of v) walk(x, depth + 1);
+    } else if (isObj(v)) {
+      for (const [k, x] of Object.entries(v)) {
+        if (k.length > BOUNDS.schemaKey) throw new ConfigError(where, 'has a name that is too long');
+        if (credentialLike(k)) throw new ConfigError(where, 'looks like a credential; this lab takes none');
+        walk(x, depth + 1);
+      }
+    }
+  };
+  walk(root, 0);
+}
 const list = (v, where, max) => {
   if (!Array.isArray(v) || v.length > max) throw new ConfigError(where, `must be a list of at most ${max}`);
   return v;
@@ -103,6 +126,7 @@ export function normalizeConfig(raw) {
       if (!nameOk(t.name, TOOL_NAME) || toolNames.has(t.name)) throw new ConfigError(`${tt}.name`, 'is not allowed or is a duplicate');
       toolNames.add(t.name);
       if (t.inputSchema !== undefined && !isObj(t.inputSchema)) throw new ConfigError(`${tt}.inputSchema`, 'must be an object');
+      if (t.inputSchema !== undefined) schemaText(t.inputSchema, `${tt}.inputSchema`);
       if (t.inputSchema !== undefined && JSON.stringify(t.inputSchema).length > 4000) throw new ConfigError(`${tt}.inputSchema`, 'is too large');
       tools.push({ name: t.name, description: text(t.description ?? '', `${tt}.description`, 1000), inputSchema: t.inputSchema ?? { type: 'object', properties: {} } });
       qualifiedAll.add(`${m.alias}__${t.name}`);

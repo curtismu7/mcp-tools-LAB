@@ -20,6 +20,7 @@ const SERVER = {
   steps: [
     ['engine', ['--test', '--test-timeout=60000', 'test/gateway.engine.test.js']],
     ['api', ['--test', '--test-timeout=60000', 'test/gateway.api.test.js']],
+    ['credentials', ['--test', '--test-timeout=120000', 'test/gateway.credentials.test.js']],
   ],
 };
 const WEB = (file) => ({ cwd: path.join(ROOT, 'web'), steps: [['web', null, ['npx', 'vitest', 'run', file]]] });
@@ -64,6 +65,24 @@ export const MUTANTS = [
   ['M27', 'a gateway route makes an outbound request', ROUTES, "res.json({ claim: CLAIM, view: p.view, caller: p.caller.id, ...listing(p) });", 1, 0, "fetch('http://192.0.2.1:4769/').catch(() => {}); res.json({ claim: CLAIM, view: p.view, caller: p.caller.id, ...listing(p) });", SERVER],
   ['M28', 'a swagger-tagged name is retagged as a deck claim (provenance)', 'server/src/gateway/provenance.js', "{ name: 'ToolFilter', tag: 'swagger'", 1, 0, "{ name: 'ToolFilter', tag: 'deck'", SERVER],
   ['M29', 'the aggregate policy cap is tagged as a swagger name (invented field)', 'server/src/gateway/provenance.js', "{ name: 'aggregate policy cap', tag: 'deck'", 1, 0, "{ name: 'aggregate policy cap', tag: 'swagger'", SERVER],
+  // Credential detection, one rule or one place at a time (added in the fix pass after three extra mutants survived).
+  ['C01', 'the Bearer rule is removed from the credential check', CONFIG, "  /\\bBearer\\s+\\S{8,}/i,\n", 1, 0, '', SERVER],
+  ['C02', 'the key-prefix rule is removed from the credential check', CONFIG, "  /\\b(?:sk|pk|rk|ghp|gho|ghs|xox[abprs])[-_][A-Za-z0-9_-]{12,}/,\n", 1, 0, '', SERVER],
+  ['C03', 'the AKIA rule is removed from the credential check', CONFIG, "  /\\bAKIA[0-9A-Z]{16}\\b/,\n", 1, 0, '', SERVER],
+  ['C04', 'the long mixed-case token rule is removed from the credential check', CONFIG, "  /(?=[A-Za-z0-9+/_-]*[a-z])(?=[A-Za-z0-9+/_-]*[A-Z])(?=[A-Za-z0-9+/_-]*\\d)[A-Za-z0-9+/_-]{32,}/,\n", 1, 0, '', SERVER],
+  ['C05', 'the JWT rule is removed from the credential check', CONFIG, "  /\\beyJ[A-Za-z0-9_-]{4,}\\.[A-Za-z0-9_-]{4,}(?:\\.[A-Za-z0-9_-]*)?/,\n", 1, 0, '', SERVER],
+  ['C06', 'names (tool, member, alias, caller id) are no longer checked for a credential', CONFIG, 're.test(n) && !credentialLike(n);', 1, 0, 're.test(n);', SERVER],
+  ['C07', 'descriptions and labels are no longer checked for a credential', CONFIG, "  if (credentialLike(v)) throw new ConfigError(where, 'looks like a credential; this lab takes none');\n  return v;", 1, 0, '  return v;', SERVER],
+  ['C08', 'call arguments are no longer checked for a credential', ROUTES, ' || argsLookLikeCredentials(req.body.arguments)', 1, 0, '', SERVER],
+  ['C09', 'the inputSchema is not checked for a credential at all', CONFIG, "      if (t.inputSchema !== undefined) schemaText(t.inputSchema, `${tt}.inputSchema`);\n", 1, 0, '', SERVER],
+  ['C10', 'inputSchema keys are not checked for a credential', CONFIG, "        if (credentialLike(k)) throw new ConfigError(where, 'looks like a credential; this lab takes none');\n", 1, 0, '', SERVER],
+  ['C11', 'inputSchema string values are not checked for a credential', CONFIG, "      if (credentialLike(v)) throw new ConfigError(where, 'looks like a credential; this lab takes none');\n    } else if (Array.isArray(v)) {", 1, 0, '    } else if (Array.isArray(v)) {', SERVER],
+  ['C12', 'inputSchema list items are not walked', CONFIG, '      for (const x of v) walk(x, depth + 1);', 1, 0, '      void v;', SERVER],
+  ['C13', 'inputSchema object values are not walked', CONFIG, '        walk(x, depth + 1);\n      }', 1, 0, '        void x;\n      }', SERVER],
+  ['C14', 'the inputSchema depth bound is lifted', CONFIG, 'nodes > BOUNDS.schemaNodes || depth > BOUNDS.schemaDepth', 1, 0, 'nodes > BOUNDS.schemaNodes', SERVER],
+  ['C15', 'the inputSchema value-count bound is lifted', CONFIG, 'nodes > BOUNDS.schemaNodes || depth > BOUNDS.schemaDepth', 1, 0, 'depth > BOUNDS.schemaDepth', SERVER],
+  ['C16', 'the inputSchema string-length bound is lifted', CONFIG, 'if (v.length > BOUNDS.schemaText)', 1, 0, 'if (false)', SERVER],
+  ['C17', 'the inputSchema key-length bound is lifted', CONFIG, 'if (k.length > BOUNDS.schemaKey)', 1, 0, 'if (false)', SERVER],
   ['W01', 'the banner is removed from every tab', 'web/src/App.jsx', '      <ReleaseBanner config={config} />\n', 1, 0, '', WEB(GW_PAGE)],
   ['W02', 'the banner disappears in presenter mode', 'web/src/components/ReleaseBanner.jsx', 'export default function ReleaseBanner({ config }) {', 1, 0, 'export default function ReleaseBanner({ config }) {\n  if (document.documentElement.dataset.present === "1") return null;', WEB(GW_PAGE)],
   ['W03', 'Reset no longer restores the gateway state', 'web/src/lib/gateway.js', 'reset: load,', 1, 0, 'reset: () => {},', WEB(GW_PAGE)],
