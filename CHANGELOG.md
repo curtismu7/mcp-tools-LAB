@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Entitled listing and aggregate cap: a simulation of a Ping release claim (2026-11-02), UNVERIFIED on our tenant. `/api/gateway/*` routes, an Entitled listing page, a banner on every tab and in presenter mode, a third diagram run (with a phone layout), story MT3, content-pack terms and why-it-matters entries, a `filtered-listing` scan limit, tests with negative controls and a mutation runner (`npm run mutate`). Details: `docs/entitled-listing.md`.
+- Entitled listing and aggregate cap: a simulation of a Ping release claim (2026-11-02), UNVERIFIED on our tenant. `/api/gateway/*` routes, an Entitled listing page, a banner on every tab and in presenter mode, a third diagram run (with a phone layout), story MT3, content-pack terms and why-it-matters entries, a `filtered-listing` scan limit, tests with negative controls and a mutation runner (`npm run mutate`). Details: `docs/entitled-listing.md`. Fix pass: a credential typed anywhere inside a tool inputSchema is refused (bounded walk), and `gateway.credentials.test.js` plus mutants C01-C17 pin every credential rule and place.
 
 ## 0.1.0
 
