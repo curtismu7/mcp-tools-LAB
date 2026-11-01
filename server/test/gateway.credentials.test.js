@@ -4,7 +4,7 @@
 // refusal can only come from the value, not from the shape of the request. Ping release claim of 2026-11-02, UNVERIFIED on our tenant.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BOUNDS, credentialLike, nameOk, TOOL_NAME } from '../src/gateway/config.js';
+import { BOUNDS, credentialLike, credentialRules, nameOk, RULE_NAMES, TOOL_NAME } from '../src/gateway/config.js';
 import { freshConfig } from '../src/gateway/fixture.js';
 import { startApp } from './helpers.js';
 
@@ -18,7 +18,95 @@ const SHAPES = {
   prefixed: ['sk', 'live', 'Abcdefgh1234567890XyZ'].join('-'),
   akia: ['AKIA', 'ABCDEFGHIJKLMNOP'].join(''),
   long: ['Abcdefghij1234567890', 'Abcdefghij12'].join(''),
+  jwtNoSignature: ['eyJhbGciOi', 'eyJzdWIiOi', ''].join('.'),
+  bearerLower: ['bearer', 'abcd1234'].join(' '),
+  ghp: ['ghp', 'abcdefghijkl1234'].join('_'),
+  xox: ['xox', 'b-1234567890-abcdefghij'].join(''),
+  glued: ['tok', 'ghp', 'abcdefghijkl1234'].join('_'),
+  hex: ['abcdef0123456789', 'abcdef0123456789'].join(''),
+  basic: ['Basic', 'dXNlcjpwYXNzd29yZA=='].join(' '),
+  assignment: ['pass', 'word=hunter22'].join(''),
 };
+
+const K = (prefix, rest) => prefix + rest; // joins at run time, so no fake key sits in the source for a secret scanner to flag
+
+// Which rule fires on which shape, and ONLY that rule. Removing a rule, or narrowing it, fails the line that pins it.
+const RULE_SHAPES = {
+  jwt: [SHAPES.jwt, SHAPES.jwtNoSignature, 'eyJhbGciOi.eyJzdWIiOi.c2ln.extra'],
+  bearer: [SHAPES.bearer, SHAPES.bearerLower, 'BEARER abcd1234', ['Bearer', 'abcd1234'].join('_'), ['bearer', 'abcd1234'].join('_'), ['Bearer', '', 'abcd1234'].join('  ')],
+  'key-prefix': [
+    SHAPES.prefixed, SHAPES.ghp, SHAPES.xox, SHAPES.glued, K('sk_', 'live_abcdefghijkl'), K('pk', '-abcdefghijklmn'), K('rk', '_abcdefghijklmn'), K('gho', '_abcdefghijkl1234'), K('ghs', '-abcdefghijkl1234'),
+    K('xoxa', '-abcdefghijklmn'), K('xoxp', '-abcdefghijklmn'), K('xoxr', '-abcdefghijklmn'), K('xoxs', '-abcdefghijklmn'), K('x_sk', '-livekeyabcdef'), K('use:sk', '-livekeyabcdef'), K('(ghp', '_abcdefghijkl1234)'),
+  ],
+  akia: [SHAPES.akia, `key ${SHAPES.akia}.`, `x_${SHAPES.akia}`],
+  'mixed-token': [SHAPES.long],
+  hex: [SHAPES.hex, `${SHAPES.hex}${SHAPES.hex}`, `id ${SHAPES.hex} id`],
+  basic: [SHAPES.basic, ['basic', 'dXNlcjpwYXNzd29yZA=='].join('_'), 'Basic YWJjZGVmZ2hpamts', 'Basic abcdefghijkl==', 'Basic abcdefghijklMnop'],
+  assignment: [SHAPES.assignment, 'secret=abcd', 'api_key=abcd1234', 'API-KEY = abcd1234', 'apikey="abcd1234"', 'passwd=abcd', 'pwd=abcd', "db_password='hunter22'", 'SECRET = abcdef'],
+};
+const fromCodes = (...codes) => String.fromCharCode(...codes);
+
+test('every credential rule is pinned by its own shapes: that rule fires, and no other', T, () => {
+  assert.deepEqual(Object.keys(RULE_SHAPES).sort(), [...RULE_NAMES].sort(), 'a rule with no pinned shape');
+  for (const [rule, shapes] of Object.entries(RULE_SHAPES)) {
+    for (const v of shapes) assert.deepEqual(credentialRules(v), [rule], `${rule}: ${JSON.stringify(v)}`);
+  }
+});
+
+test('credentialLike sees through look-alike and invisible characters (NFKC, then zero-width and other format characters removed)', T, () => {
+  const key = 'sk-livekeyabcdef';
+  assert.equal(credentialLike(key), true);
+  // a zero-width space, joiner, non-joiner, word joiner, BOM and a soft hyphen inside the shape
+  for (const cp of [0x200b, 0x200c, 0x200d, 0x2060, 0xfeff, 0x00ad]) {
+    assert.equal(credentialLike(`${key.slice(0, 5)}${fromCodes(cp)}${key.slice(5)}`), true, `U+${cp.toString(16)} inside a key`);
+    assert.equal(credentialLike(`Bea${fromCodes(cp)}rer abcd1234`), true, `U+${cp.toString(16)} inside Bearer`);
+    assert.equal(credentialLike(`eyJhbGciOi.${fromCodes(cp)}eyJzdWIiOi.`), true, `U+${cp.toString(16)} inside a JWT`);
+  }
+  // full-width letters, digits and hyphen become plain ones under NFKC
+  const wide = [...key].map((ch) => (ch === '-' ? fromCodes(0xff0d) : fromCodes(ch.charCodeAt(0) + 0xfee0))).join('');
+  assert.notEqual(wide, key);
+  assert.equal(credentialLike(wide), true, 'full-width key');
+  assert.equal(credentialLike(`${fromCodes(0xff30)}ass${fromCodes(0xff57)}ord${fromCodes(0xff1d)}hunter22`), true, 'full-width password=');
+  // control: the same characters in plain text that holds no shape
+  assert.equal(credentialLike(`find${fromCodes(0x200b)}_customer`), false);
+  assert.equal(credentialLike(`${fromCodes(0xff23)}ustomer lookup`), false);
+});
+
+test('a letter or digit in front of a prefix is not a key, an underscore or a symbol in front is', T, () => {
+  for (const v of ['task-managerdashboard', 'risk-assessment-framework', 'disk_usage_report_statement', K('mask', '-abcdefghijklmnop'), K('xsk', '-livekeyabcdef'), K('9sk', '-livekeyabcdef'), K('taskghp', '_abcdefghijkl1234')]) assert.equal(credentialRules(v).includes('key-prefix'), false, v);
+  for (const v of [K('_sk', '-livekeyabcdef'), K('a_sk', '-livekeyabcdef'), K('-sk', '-livekeyabcdef'), K('.sk', '-livekeyabcdef'), K(' sk', '-livekeyabcdef'), K('"sk', '-livekeyabcdef"'), K('token:ghp', '_abcdefghijkl1234'), K('AKIA_x_ghp', '_abcdefghijkl1234')]) assert.equal(credentialRules(v).includes('key-prefix'), true, v);
+  // same for the other rules that use the lookbehind
+  assert.equal(credentialRules(`xeyJhbGciOi.eyJzdWIiOi.`).includes('jwt'), false);
+  assert.equal(credentialRules(`_eyJhbGciOi.eyJzdWIiOi.`).includes('jwt'), true);
+  assert.equal(credentialRules(`xBearer abcd1234`).includes('bearer'), false);
+  assert.equal(credentialRules(`xAKIAABCDEFGHIJKLMNOP`).includes('akia'), false);
+  assert.equal(credentialRules(`AKIAABCDEFGHIJKLMNOPQ`).includes('akia'), false, 'a 21st character is not an access key id');
+});
+
+test('near misses that are plain text, with the rule each one stays below', T, () => {
+  const plain = [
+    'Basic authentication is required', 'Basic Authentication', 'basic information about the server', 'Basic usage example',
+    'password', 'password=', 'password=ab', 'reset the password', 'the secret is kept elsewhere', 'secret: kept elsewhere', 'api key rotation',
+    'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d', // 31 hex characters
+    'bearer of bad news', 'Bearer tokens', 'Bearer_', 'eyJabc.def', 'AKIA1234', 'ghp_short', 'xoxb-short', 'sk-livekey',
+    'get_customer_billing_statement', 'Look up one customer by name.',
+  ];
+  for (const v of plain) assert.deepEqual(credentialRules(v), [], JSON.stringify(v));
+  assert.deepEqual(credentialRules(undefined), []);
+  assert.deepEqual(credentialRules(42), []);
+});
+
+test('worst-case input (2000 characters) is decided quickly: no rule backtracks badly', T, () => {
+  const bad = [
+    'a'.repeat(2000), '0'.repeat(2000), 'A'.repeat(2000), 'Aa'.repeat(1000), 'Basic '.repeat(330), 'Basic aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa '.repeat(40),
+    'Bearer '.repeat(280), 'eyJ'.repeat(660), 'eyJabcd.'.repeat(250), 'password='.repeat(220), 'sk-'.repeat(660), 'a-'.repeat(1000), `${'a'.repeat(1990)}!`,
+    ' '.repeat(2000), '\u200b'.repeat(1000),
+  ];
+  const t0 = performance.now();
+  for (const v of bad) credentialLike(v);
+  const ms = performance.now() - t0;
+  assert.ok(ms < 3000, `took ${Math.round(ms)} ms`);
+});
 
 test('credentialLike: each rule fires on its own shape, and near misses are not credentials', T, () => {
   for (const [name, v] of Object.entries(SHAPES)) assert.equal(credentialLike(v), true, `shape ${name}`);

@@ -10,16 +10,27 @@ const ALIAS = /^[a-z][a-z0-9-]{0,15}$/; // no underscore, so alias__tool splits 
 export const TOOL_NAME = /^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/;
 const QUALIFIED = /^[a-z][a-z0-9-]{0,15}__[A-Za-z_][A-Za-z0-9_.-]{0,63}$/;
 
-// This lab takes no credential. Text that looks like one is refused (never echoed, never stored): a JWT, a Bearer value,
-// a well-known key prefix, or a long unbroken mixed-case token.
+// This lab takes no credential. Text that looks like one is refused (never echoed, never stored). This is a best-effort
+// DENYLIST of shapes, not a proof: a secret in a shape it does not know passes. The safe habit is to type no secret at all.
+// The text is first normalised (NFKC, so full-width letters become plain ones) and stripped of invisible format characters
+// (zero-width joiners and the like), so neither can hide a shape. A letter or digit in front of a prefix disables the
+// prefix rules (so "task-..." is not a key), but an underscore or a symbol does not (so "tok_ghp_..." is one).
+// One rule per line: each has a name, and the tests pin each rule alone.
 const CREDENTIAL = [
-  /\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}(?:\.[A-Za-z0-9_-]*)?/,
-  /\bBearer\s+\S{8,}/i,
-  /\b(?:sk|pk|rk|ghp|gho|ghs|xox[abprs])[-_][A-Za-z0-9_-]{12,}/,
-  /\bAKIA[0-9A-Z]{16}\b/,
-  /(?=[A-Za-z0-9+/_-]*[a-z])(?=[A-Za-z0-9+/_-]*[A-Z])(?=[A-Za-z0-9+/_-]*\d)[A-Za-z0-9+/_-]{32,}/,
+  ['jwt', /(?<![A-Za-z0-9])eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}(?:\.[A-Za-z0-9_-]*)?/],
+  ['bearer', /(?<![A-Za-z0-9])Bearer[\s_]+\S{8,}/i],
+  ['key-prefix', /(?<![A-Za-z0-9])(?:sk|pk|rk|ghp|gho|ghs|xox[abprs])[-_][A-Za-z0-9_-]{12,}/],
+  ['akia', /(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![A-Za-z0-9])/],
+  ['mixed-token', /(?=[A-Za-z0-9+/_-]*[a-z])(?=[A-Za-z0-9+/_-]*[A-Z])(?=[A-Za-z0-9+/_-]*\d)[A-Za-z0-9+/_-]{32,}/],
+  ['hex', /[0-9a-f]{32,}/],
+  ['basic', /(?<![A-Za-z0-9])[Bb]asic[\s_]+(?:(?=[A-Za-z0-9+/]*(?:[0-9+/]|[a-z][A-Z]))[A-Za-z0-9+/]{12,}={0,2}|[A-Za-z0-9+/]{12,}={1,2})/],
+  ['assignment', /(?<![A-Za-z0-9])(?:password|passwd|pwd|secret|api[-_]?key)\s*=\s*["']?[^\s"']{4,}/i],
 ];
-export const credentialLike = (s) => typeof s === 'string' && CREDENTIAL.some((re) => re.test(s));
+const clean = (s) => s.normalize('NFKC').replace(/\p{Cf}/gu, '');
+// The names of the rules that fire on <s> (empty for anything that is not text). For tests; credentialLike is the gate.
+export const credentialRules = (s) => (typeof s === 'string' ? CREDENTIAL.filter(([, re]) => re.test(clean(s))).map(([name]) => name) : []);
+export const credentialLike = (s) => credentialRules(s).length > 0;
+export const RULE_NAMES = CREDENTIAL.map(([name]) => name);
 
 export class ConfigError extends Error {
   constructor(where, what) { super(`${where}: ${what}`); this.code = 'bad_config'; }

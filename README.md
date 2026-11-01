@@ -13,7 +13,7 @@ Press Scan on a connected server, read the findings with their evidence, and onl
 
 ## Status
 
-Built and tested. On a clean clone with nothing else checked out, `npm test` runs 140 always-on server tests (all pass) and 74 web tests, plus 2 optional server tests that are reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`, and the full-swagger check of the release-claim names, which needs `SWAGGER_FILE`); with a `hostile-mcp` checkout and the swagger file those run too, 136 of 136. The same counts hold on Node 22. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
+Built and tested. On a clean clone with nothing else checked out, `npm test` runs 158 server tests (156 always-on, all pass) and 89 web tests, plus 2 optional server tests that are reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`, and the full-swagger check of the release-claim names, which needs `SWAGGER_FILE`); with a `hostile-mcp` checkout and the swagger file those run too, 158 of 158. The same counts hold on Node 22. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
 
 
 
@@ -113,6 +113,7 @@ The image runs as a non-root user. Inside the container the server listens on al
 - Shelf: merge `docs/shelf-entry.json` (D3 and D4, one app) into the shelf's `.data/demos.local.json`; it shows Ready from `/api/health`. **Override `composeFile` first:** the committed value is the author's absolute path (`/Users/cmuir/Development/mcp-tools/docker-compose.yml`); replace it, in both entries, with the absolute path of `docker-compose.yml` in your checkout, or the shelf cannot start the stack.
 - Learning Hub: `content-pack.json`, regenerate and validate with `npm run content-pack`.
 - Browser run: `npm run build && npm run e2e` (needs a `hostile-mcp` checkout next to this repo; see [docs/packaging.md](docs/packaging.md)).
+- Diagram drag check: `npm run build && npm run diagram-check` drags every box on every run at 1440 and 375 wide and fails if an edge label lands on a box or another label (a real browser; not part of `npm test`).
 
 ## How it pairs with the other demos
 

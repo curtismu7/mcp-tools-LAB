@@ -60,11 +60,58 @@ test('call: a hidden tool is refused by name with 403 and the same words as an u
     const ok = await post(app, 'call', { caller: 'operator', tool: 'crm__update_customer', arguments: { id: 'c-1' } });
     assert.equal(hidden.status, 403); assert.equal(unknown.status, 403); assert.equal(ok.status, 200);
     assert.equal(hidden.json.message, unknown.json.message);
+    const body = ({ demoTrace, ...rest }) => rest; // the demo trace is labelled demo only and differs by design
+    assert.deepEqual(body(hidden.json), body(unknown.json), 'the whole body, not only the message');
     assert.equal(hidden.json.error, 'tool_not_available');
     assert.match(hidden.json.demoTrace.note, /Demo only/);
     assert.equal(hidden.json.demoTrace.steps[0].layer, 'aggregate-cap');
     assert.match(ok.json.result.content[0].text, /nothing was run/);
     assert.equal((await post(app, 'call', { caller: 'operator', view: 'direct', member: 'crm', tool: 'export_all' })).status, 200, 'negative control: direct follows the member policy');
+  });
+});
+
+test('direct view: an unknown tool gets the same refusal body as a hidden one, and the same status', T, async () => {
+  await withApp({}, async (app) => {
+    const direct = (caller, tool) => post(app, 'call', { caller, view: 'direct', member: 'crm', tool });
+    const hidden = await direct('analyst', 'update_customer'); // exists on the member, the analyst's own policy does not allow it
+    const unknown = await direct('analyst', 'nothing_here');
+    assert.equal((await direct('operator', 'update_customer')).status, 200, 'control: the operator may call it');
+    assert.equal(hidden.status, 403); assert.equal(unknown.status, 403);
+    const body = ({ demoTrace, ...rest }) => rest;
+    assert.deepEqual(body(hidden.json), body(unknown.json));
+    assert.equal(unknown.json.error, 'tool_not_available');
+    assert.match(unknown.json.message, /not available to this caller/);
+    assert.ok(!unknown.text.includes('nothing_here') && !hidden.text.includes('update_customer'), 'the refusal repeats no tool name');
+    // the demo trace is the only place the two differ
+    assert.equal(hidden.json.demoTrace.steps[0].layer, 'member-policy');
+    assert.equal(unknown.json.demoTrace.steps[0].layer, 'unknown');
+  });
+});
+
+test('call arguments are bounded, with literal values: 200 values, depth 4, a string of 2000, a key of 100; one more is refused', T, async () => {
+  await withApp({}, async (app) => {
+    const call = (args) => post(app, 'call', { caller: 'operator', tool: 'crm__find_customer', arguments: args });
+    const status = async (args) => (await call(args)).status;
+    const items = (count) => Array.from({ length: count }, () => 1);
+    // the object and the list count as one value each, so a list of 198 makes 200 values
+    assert.equal(await status({ a: items(198) }), 200, '200 values');
+    assert.equal(await status({ a: items(199) }), 400, '201 values');
+    assert.equal(await status({ a: { b: { c: { d: 1 } } } }), 200, 'depth 4');
+    assert.equal(await status({ a: { b: { c: { d: { e: 1 } } } } }), 400, 'depth 5');
+    assert.equal(await status({ a: [[[1]]] }), 200, 'depth 4 through lists');
+    assert.equal(await status({ a: [[[[1]]]] }), 400, 'depth 5 through lists');
+    assert.equal(await status({ a: 'n'.repeat(2000) }), 200, 'string of 2000');
+    assert.equal(await status({ a: 'n'.repeat(2001) }), 400, 'string of 2001');
+    assert.equal(await status({ a: ['n'.repeat(2000)] }), 200, 'string of 2000 in a list');
+    assert.equal(await status({ a: ['n'.repeat(2001)] }), 400, 'string of 2001 in a list');
+    assert.equal(await status({ ['n'.repeat(100)]: 1 }), 200, 'key of 100');
+    assert.equal(await status({ ['n'.repeat(101)]: 1 }), 400, 'key of 101');
+    assert.equal(await status({ a: { ['n'.repeat(101)]: 1 } }), 400, 'nested key of 101');
+    const r = await call({ a: items(199) });
+    assert.equal(r.json.error, 'bad_config');
+    assert.match(r.json.message, /^arguments: /);
+    assert.equal(await status([1]), 400, 'a list is not an object');
+    assert.equal(await status({}), 200, 'control: empty arguments');
   });
 });
 
@@ -133,8 +180,8 @@ test('hostile input: bounds on size, counts, duplicates and dangling names; unkn
     await bad((w) => { w.callers = Array.from({ length: BOUNDS.callers + 1 }, (_, i) => ({ id: `c${i}`, label: 'x' })); }, 'too many callers');
     await bad((w) => { w.members.push(...Array.from({ length: BOUNDS.members }, (_, i) => ({ ...structuredClone(w.members[0]), id: `m${i}`, alias: `m${i}` }))); }, 'too many members');
     await bad((w) => { w.members[1].alias = 'crm'; for (const g of w.cap) g.tools = g.tools.map((t) => t.replace('bill__', 'crm__')); }, 'duplicate alias (the cap is renamed to match, so only the duplicate is wrong)');
-    await bad((w) => { w.members[1].alias = 'a__b'; }, 'alias with double underscore');
-    await bad((w) => { w.members[0].tools[1].name = 'find_customer'; }, 'duplicate tool');
+    await bad((w) => { w.members[1].alias = 'a__b'; w.cap = w.cap.map((g) => ({ ...g, tools: g.tools.filter((t) => !t.startsWith('bill__')) })); }, 'alias with double underscore (the cap no longer names it, so only the alias is wrong)');
+    await bad((w) => { w.members[0].tools.push({ name: 'find_customer', description: 'again' }); }, 'duplicate tool (added, so nothing else dangles)');
     await bad((w) => { w.members[0].policy[0].tools.push('ghost'); }, 'policy names a missing tool');
     await bad((w) => { w.cap[0].tools.push('crm__ghost'); }, 'cap names a missing tool');
     await bad((w) => { w.cap.push({ caller: 'ghost', tools: [] }); }, 'cap names a missing caller');
