@@ -1,0 +1,51 @@
+{
+  "schema": "swagger-excerpt/1",
+  "note": "Schema names only, copied from the console swagger of 2026-10-31 (anonymous read). It proves a field name exists; it proves no behaviour. Nothing was called.",
+  "sha256_of_full_file": "24ddcfe4c8f9260d978ef2071c50e9c008d282d7d45df2947d2718b9386bc614",
+  "present_on_2026-10-26": true,
+  "definitions": {
+    "modelMcpAggregateMember": {
+      "type": "object",
+      "properties": {
+        "AppRef": {
+          "$ref": "#/definitions/modelObjectRef"
+        },
+        "Alias": {
+          "type": "string"
+        },
+        "ToolFilter": {
+          "$ref": "#/definitions/modelStringArray"
+        }
+      },
+      "description": "One member MCP server of an mcp-aggregate application. Alias namespaces the\nmember's tools as \"<Alias>__<tool>\" in the merged catalog."
+    },
+    "modelMcpAggregateMembers": {
+      "type": "object",
+      "properties": {
+        "Members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/modelMcpAggregateMember"
+          }
+        }
+      },
+      "description": "Wrapper so the field is a named type with MarshalCQL, as a bare repeated\nfield reaches gocql as []McpAggregateMember and has no blob encoding."
+    },
+    "modelStringArray": {
+      "type": "object",
+      "properties": {
+        "Elems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "title": "custom string array type"
+    }
+  },
+  "modelMcpAppConfig.Members": {
+    "$ref": "#/definitions/modelMcpAggregateMembers",
+    "description": "Set only on AppType \"mcp-aggregate\"; Backends/AuthMode/ResourceOAuth are\nunused there, and the members carry their own backend config."
+  }
+}

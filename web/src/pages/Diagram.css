@@ -1,0 +1,4 @@
+/* Diagram additions. Colours come from the theme tokens; none is written here. */
+.flow-wrap .react-flow__edge-text { font-size: 0.8125rem; }
+.fbox[data-layout="wide"] { width: 170px; }
+.fbox[data-layout="narrow"] { width: 150px; }

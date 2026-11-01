@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Entitled listing and aggregate cap: a simulation of a Ping release claim (2026-11-02), UNVERIFIED on our tenant. `/api/gateway/*` routes, an Entitled listing page, a banner on every tab and in presenter mode, a third diagram run (with a phone layout), story MT3, content-pack terms and why-it-matters entries, a `filtered-listing` scan limit, tests with negative controls and a mutation runner (`npm run mutate`). Details: `docs/entitled-listing.md`. Fix pass: a credential typed anywhere inside a tool inputSchema is refused (bounded walk), and `gateway.credentials.test.js` plus mutants C01-C17 pin every credential rule and place. Second fix pass: edge labels on the diagram move off any box dragged onto them (the tighter layout had closed the gap they sat in) and `npm run diagram-check` drags every box in a real browser; the credential check is a named, per-rule denylist (lookbehind prefix rules, NFKC and zero-width stripping, hex, Basic-auth and password= rules, each pinned alone); `gateway.config.test.js` pins every limit and refusal with literal bounds; mutants K, R, L and B added; README test counts corrected.
+
 ## 0.1.0
 
 - Review fixes 1: the scanner criterion runs on every clone against a committed hostile-mcp snapshot (`scripts/capture-hostile-snapshot.mjs`), the live test is optional and says SKIPPED loudly; per-test timeouts and cleanup so a removed confirm gate fails fast; isolated `argsHash` tests; the rug-pull banner compares the scanned list with the current one; packaging checks use committed copies with recorded source commits; README counts and the shelf `composeFile` override.

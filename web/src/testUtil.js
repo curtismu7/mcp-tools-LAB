@@ -1,4 +1,18 @@
-import { vi } from "vitest";
+import { inject, vi } from "vitest";
+
+const nodeFetch = globalThis.fetch;
+
+// The page tests for the simulated gateway talk to the REAL engine, not to canned replies, so a number on the page is a
+// number the engine produced. src/globalSetup.js starts the server (in plain Node, on a loopback test port) once per run
+// and hands its origin to the tests. Everything else stays faked.
+export const gatewayOrigin = () => inject("gatewayOrigin");
+/** Call after mockServer(): sends /api/gateway/* to the real engine at `origin`, everything else to the fake. */
+export function routeGatewayTo(origin) {
+  const fake = globalThis.fetch;
+  globalThis.fetch = vi.fn((url, init = {}) => (String(url).startsWith("/api/gateway/")
+    ? nodeFetch(origin + url, { ...init, redirect: "error", headers: { ...(init.headers || {}), Origin: origin } })
+    : fake(url, init)));
+}
 
 // A fake fetch for the page tests. `calls` records every request; `overrides` replace or add routes.
 export const REPORT = {
