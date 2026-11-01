@@ -31,6 +31,12 @@ Not verified:
 - The e2e script needs a hostile-mcp checkout, git, npm and a Playwright Chromium; it is documented, not run by CI.
 - The optional live hostile-server test (`hostile.integration.test.js`) is skipped, with `SKIPPED: set HOSTILE_MCP_SRC` in its title, when no `hostile-mcp` checkout is next to this repo, so CI does not run it. The criterion itself does not depend on it: the committed-snapshot test above always runs. The snapshot can go stale; it is not refreshed automatically.
 
+## Entitled listing and aggregate cap (Ping release claim, simulated)
+
+**Ping release claim (2026-11-02), UNVERIFIED on our tenant.** The Entitled listing page and the third run on the diagram simulate what Ping's release is said to add to MCP gateways: a tool the caller is not entitled to is removed from `tools/list` and refused again when called by name, and an aggregate of member MCP servers (tools named `alias__tool`) has one policy that caps every member, enforced on the listing and again at the member hop. An unreachable member is reported, not dropped. The SE gateway (v1.261030) does not have the release, so **there is no live path for this feature**: it is a simulation in this process (no socket, no outbound call), the same in the live inspector and in the hosted mock. A banner says so on every tab and in presenter mode.
+
+A scan of a filtered list covers only what that caller sees, so a clean result is not clean for other callers; the scan notes and the Limits page say so. Names from the console swagger (`Members`, `AppRef`, `Alias`, `ToolFilter`, AppType `mcp-aggregate`) are tagged as schema names only; the entitlement behaviour and the cap have no swagger field and are tagged as deck claims. Full tagging, the talk track and the tests: [docs/entitled-listing.md](docs/entitled-listing.md). `npm run mutate` checks that each policy field and rule is really tested.
+
 ## Run it
 
 ```bash

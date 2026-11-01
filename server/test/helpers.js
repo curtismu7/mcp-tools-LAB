@@ -24,7 +24,7 @@ export async function startApp({ env = {}, dir = tmpDir() } = {}) {
   const srv = await listenInRange(app);
   const origin = `http://127.0.0.1:${srv.port}`;
   async function call(method, p, body, { headers = {}, origin: o = origin, raw = false } = {}) {
-    const h = { ...headers };
+    const h = { Connection: 'close', ...headers }; // tests reuse a few fixed ports, so never reuse a pooled socket to a closed server
     if (o && method !== 'GET') h.Origin = o;
     if (body !== undefined && !raw) h['Content-Type'] = 'application/json';
     const res = await fetch(`${origin}${p}`, { redirect: 'error', method, headers: h, body: body === undefined ? undefined : raw ? body : JSON.stringify(body) });
