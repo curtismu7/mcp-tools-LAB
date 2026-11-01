@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { argsHash, canonicalJson } from './canonical.js';
 import { dataDir, pingoneEnabled, port as configPort, scanMaxBytes } from './config.js';
+import { createGatewayRouter } from './gateway/routes.js';
 import { createHealth } from './health.js';
 import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
@@ -51,6 +52,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   api.use(sameOriginWrites());
   if (mock) api.use(mockGuard());
   api.use('/health', health.router);
+  api.use('/gateway', createGatewayRouter()); // simulated gateway: pure, in-process, no connection and no outbound call
 
   // Text from a failing server or transport, with this connection's secrets removed.
   const fail = (res, err, conn, status = 502) => {

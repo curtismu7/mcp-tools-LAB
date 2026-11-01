@@ -100,6 +100,51 @@ export const WIRE = {
   },
 };
 
+// The entitled-listing view (Ping release claim of 2026-11-02, UNVERIFIED on our tenant). Examples only; the Entitled
+// listing page shows what the simulated engine actually returns.
+const GW_HOST = "gateway.example.com";
+WIRE.gcaller = {
+  title: "The caller asks what it may use",
+  traffic: true,
+  req: { line: "POST /mcp HTTP/1.1", headers: [`Host: ${GW_HOST}`, `Authorization: ${bearer}`, "Content-Type: application/json"], body: json({ jsonrpc: "2.0", id: 1, method: "tools/list" }) },
+  res: { line: "HTTP/1.1 200 OK", headers: ["Content-Type: application/json"], body: json({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "crm__find_customer" }, { name: "wiki__search_pages" }] } }) },
+  token: tok("The token that tells the gateway who is asking (Example)", ["sub", "scope"]),
+  notice: "The list holds only what this caller is entitled to. Nothing in the reply says what was left out. A different caller gets a different list.",
+};
+WIRE.ggw = {
+  title: "Gateway: entitlement-aware discovery",
+  traffic: false,
+  none: "This happens inside the gateway. It decides per caller which tools exist for them, so a tool the caller may not use is removed from the list rather than only refused later.",
+  notice: "Hiding is not enough. The same tool, called by name, is refused again; both are tested on the Entitled listing page.",
+};
+WIRE.gagg = {
+  title: "Aggregate: namespaced tools and a policy cap",
+  traffic: true,
+  req: { line: "POST /mcp HTTP/1.1", headers: [`Host: ${GW_HOST}`, `Authorization: ${bearer}`, "Content-Type: application/json"], body: json({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "crm__export_all", arguments: {} } }) },
+  res: { line: "HTTP/1.1 403 Forbidden", headers: ["Content-Type: application/json"], body: json({ error: "tool_not_available", message: "That tool is not available to this caller." }) },
+  token: tok("The same caller token (Example)", ["sub", "scope"]),
+  notice: "Member tools carry the member alias, alias__tool. The aggregate's policy is a cap: a tool the member would allow is still refused when the cap does not. The refusal words are the same for a hidden tool and for one that does not exist.",
+};
+WIRE.ghop = {
+  title: "Member hop: the cap is checked again",
+  traffic: false,
+  none: "After routing, before the call is forwarded to the member, the cap and the member's own policy are checked a second time with the member's own tool name. A stale list or a routing slip cannot get past it.",
+  notice: "One policy, enforced twice: on the listing and at the hop. The tests drive the hop on its own to prove it.",
+};
+WIRE.gmember = {
+  title: "Member MCP server",
+  traffic: true,
+  req: { line: "POST /mcp HTTP/1.1", headers: ["Host: crm.example.com", "Content-Type: application/json"], body: json({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "update_customer", arguments: { id: "c-1" } } }) },
+  res: { line: "HTTP/1.1 200 OK", headers: ["Content-Type: application/json"], body: json({ jsonrpc: "2.0", id: 2, result: { content: [{ type: "text", text: "done" }] } }) },
+  notice: "The member sees its own tool name, without the alias. Used directly, the same member follows only its own policy: no cap and no ToolFilter. That is the negative control in the tests.",
+};
+WIRE.gdown = {
+  title: "A member that cannot be reached",
+  traffic: false,
+  none: "The member did not answer. The aggregate does not quietly list fewer tools: it reports that member as unreachable, or as needing the caller's own sign-in.",
+  notice: "A silent gap would look like 'no tools here'. A reported gap tells the operator something is down.",
+};
+
 // The Server page: the call flow's two messages, built from the arguments the person previewed.
 export function callWire(name, canonical, result) {
   let body = canonical;
