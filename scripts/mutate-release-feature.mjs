@@ -53,7 +53,7 @@ export const MUTANTS = [
   ['M16', 'the refusal words differ by layer (leaks existence)', SIM, "const refused = (trace) => ({ ok: false, ...NOT_AVAILABLE, trace });", 1, 0, "const refused = (trace) => ({ ok: false, ...NOT_AVAILABLE, message: `${REFUSAL} ${trace[0].layer}`, trace });", SERVER],
   ['M17', 'the listing reports a count of hidden tools (leak)', SIM, 'return { tools, members: cfg.members.map((m) => ({ alias: m.alias, status: status(m, caller) })) };', 1, 0, 'return { hidden: 1, tools, members: cfg.members.map((m) => ({ alias: m.alias, status: status(m, caller) })) };', SERVER],
   ['M18', 'a typed credential is no longer refused', CONFIG, "export const credentialLike = (s) => typeof s === 'string' && CREDENTIAL.some((re) => re.test(s));", 1, 0, 'export const credentialLike = () => false;', SERVER],
-  ['M19', 'unknown config fields are accepted', CONFIG, "    if (!allowed.includes(k)) throw new ConfigError(where, 'unexpected field');", 1, 0, '    void k;', SERVER],
+  ['M19', 'unknown config fields are accepted', CONFIG, "if (!allowed.includes(k)) throw new ConfigError(where, 'unexpected field');", 1, 0, 'void k;', SERVER],
   ['M20', 'a duplicate alias is accepted', CONFIG, "if (!nameOk(m.alias, ALIAS) || aliases.has(m.alias))", 1, 0, 'if (!nameOk(m.alias, ALIAS))', SERVER],
   ['M21', 'a policy naming a tool the member lacks is accepted', CONFIG, "if (!toolNames.has(n)) throw new ConfigError(where, 'names a tool the member does not have');", 1, 0, 'void n;', SERVER],
   ['M22', 'a cap naming a tool no member has is accepted', CONFIG, "if (!qualifiedAll.has(q)) throw new ConfigError('cap', 'names a tool no member has');", 1, 0, 'void q;', SERVER],

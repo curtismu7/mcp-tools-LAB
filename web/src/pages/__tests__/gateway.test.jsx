@@ -117,6 +117,18 @@ describe("Entitled listing page (real engine)", () => {
     expect(within(members).getAllByRole("listitem")).toHaveLength(3);
   });
 
+  it("a member that needs each caller's own sign-in is reported as needing it until the caller is signed in", async () => {
+    const user = userEvent.setup();
+    await openGateway(user);
+    const wiki = screen.getByText("wiki", { selector: "legend code" }).closest("fieldset");
+    await user.click(within(wiki).getByLabelText(/Needs each caller's own sign-in/));
+    await waitFor(() => expect(count()).toBe(5));
+    const members = screen.getByRole("list", { name: "Member status" });
+    expect(within(members).getByText("wiki", { selector: "code" }).closest("li")).toHaveTextContent(/needs the caller's own sign-in \(reported, not dropped\)/);
+    await user.click(within(wiki).getByLabelText("Operator", { selector: "input" }));
+    await waitFor(() => expect(count()).toBe(6));
+  });
+
   it("editing a cap box changes the list, and Reset restores the config the server holds", async () => {
     const user = userEvent.setup();
     await openGateway(user);

@@ -132,7 +132,7 @@ test('hostile input: bounds on size, counts, duplicates and dangling names; unkn
     await bad((w) => { w.members[0].tools = Array.from({ length: BOUNDS.tools + 1 }, (_, i) => ({ name: `t${i}`, description: 'x' })); w.members[0].toolFilter = []; w.members[0].policy = []; w.cap = []; }, 'too many tools');
     await bad((w) => { w.callers = Array.from({ length: BOUNDS.callers + 1 }, (_, i) => ({ id: `c${i}`, label: 'x' })); }, 'too many callers');
     await bad((w) => { w.members.push(...Array.from({ length: BOUNDS.members }, (_, i) => ({ ...structuredClone(w.members[0]), id: `m${i}`, alias: `m${i}` }))); }, 'too many members');
-    await bad((w) => { w.members[1].alias = 'crm'; }, 'duplicate alias');
+    await bad((w) => { w.members[1].alias = 'crm'; for (const g of w.cap) g.tools = g.tools.map((t) => t.replace('bill__', 'crm__')); }, 'duplicate alias (the cap is renamed to match, so only the duplicate is wrong)');
     await bad((w) => { w.members[1].alias = 'a__b'; }, 'alias with double underscore');
     await bad((w) => { w.members[0].tools[1].name = 'find_customer'; }, 'duplicate tool');
     await bad((w) => { w.members[0].policy[0].tools.push('ghost'); }, 'policy names a missing tool');
