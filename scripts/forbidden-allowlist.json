@@ -1,0 +1,5 @@
+{
+  "_comment": "Hosts and ids the forbidden-string gate lets through, each with the reason. Add nothing here without a reason.",
+  "hosts": [],
+  "uuids": []
+}
