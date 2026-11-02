@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",
     "start": "npm start -w server",
-    "test": "npm test -w server && npm test -w web",
+    "test": "npm test -w server && npm test -w web && node --test scripts/check-forbidden-strings.test.mjs",
     "build": "npm run build -w web",
     "scan": "node server/src/scanner/cli.js",
     "doctor": "node scripts/doctor.mjs",
@@ -24,7 +24,8 @@
     "diagram-check": "node scripts/diagram-drag-check.mjs",
     "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs",
     "docs": "node scripts/build-scan-rules.mjs",
-    "mutate": "node scripts/mutate-release-feature.mjs"
+    "mutate": "node scripts/mutate-release-feature.mjs",
+    "check:forbidden": "node scripts/check-forbidden-strings.mjs"
   },
   "devDependencies": {
     "ajv": "^8.20.0",
