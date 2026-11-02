@@ -65,7 +65,8 @@ test('docs/shelf-entry.json holds valid shelf registry entries for D3 and D4 on 
     assert.match(d.id, /^[a-z0-9-]{2,41}$/);
     assert.equal(d.url, 'http://localhost:4810');
     assert.equal(d.healthPath, '/api/health');
-    assert.ok(d.composeFile.startsWith('/') && d.composeFile.endsWith('docker-compose.yml'), 'composeFile is an absolute path (the shipped value is the author\'s; README says how to override it)');
+    assert.ok(!d.composeFile.startsWith('/') && !d.composeFile.includes('..') && d.composeFile.endsWith('docker-compose.yml'), 'composeFile is portable: relative to the shelf demo root, never an author path');
+    assert.ok(d.tags.includes('mcp-server-built'), 'tagged as an MCP server we built');
     assert.ok(d.name.length <= 300 && d.description.length <= 300);
   }
 });
