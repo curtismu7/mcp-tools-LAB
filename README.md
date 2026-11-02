@@ -1,4 +1,7 @@
-# MCP tools
+# MCP tools LAB
+
+Tier: Tester
+Repo: https://github.com/ping-sandbox/mcp-tools-LAB
 
 Connect to an MCP server, list what it offers, scan that metadata for poison **before an agent ingests it**, and only then call tools, with an explicit confirm step. One repo, one app. Catalog items D3 (MCP inspector) and D4 (MCP scanner); D35 (conformance scorecard) is meant to build on this later.
 
@@ -19,7 +22,7 @@ Built and tested. On a clean clone with nothing else checked out, `npm test` run
 
 - Server: Streamable HTTP and stdio MCP clients, tools, resources, prompts and the other protocol methods, saved connections, the confirm-gated `tools/call`, the scanner library and CLI, `GET /api/health` (`demo-health/1`), doctor.
 - Scanner: 19 rules with stable ids and fixed severities (info, warn, high), evidence spans, invisible/bidi/tag/homoglyph detection with the characters made visible, name-shadowing against a trusted-names list, size/depth/count budgets that end in a "scan truncated" finding, and a machine-readable `scan-report/1` ([schema](docs/scan-report.schema.json)).
-- An always-on test that scans a committed snapshot of what the real [hostile-mcp](https://github.com/cmuir_pingcorp/hostile-mcp) server serves (`server/test/fixtures/hostile-snapshot.json`, captured by `node scripts/capture-hostile-snapshot.mjs`, source commit recorded inside it): its poisoned tools, resource and prompt are flagged, its benign tools are not, and the rug-pull shows up on the second list. If a local checkout is newer than the snapshot the test only warns. The same assertions also run as an optional live test that clones the real server (below).
+- An always-on test that scans a committed snapshot of what the real [hostile-mcp](https://github.com/ping-sandbox/hostile-mcp-LAB) server serves (`server/test/fixtures/hostile-snapshot.json`, captured by `node scripts/capture-hostile-snapshot.mjs`, source commit recorded inside it): its poisoned tools, resource and prompt are flagged, its benign tools are not, and the rug-pull shows up on the second list. If a local checkout is newer than the snapshot the test only warns. The same assertions also run as an optional live test that clones the real server (below).
 - Web UI: Connect page (saved connections, HTTP or stdio, test, write-only token), Server page (Tools / Resources / Prompts, scan-before-first-use banner, list-changed signal, Scan, verdict, findings by severity with evidence, "what this scan cannot catch"), a call panel with a schema form and a confirm dialog, offline snapshot scan with report download, two stories (generic, airlines and banking packs) with a presenter mode, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), a limits page, light and dark themes. Untrusted strings render as inert text only.
 
 Not verified:
@@ -39,6 +42,8 @@ A scan of a filtered list covers only what that caller sees, so a clean result i
 
 ## Run it
 
+Run from a clone of https://github.com/ping-sandbox/mcp-tools-LAB (Node 26 or newer):
+
 ```bash
 npm install
 npm run doctor     # node, bind, state dir mode, port; prints no secrets
@@ -49,6 +54,10 @@ npm run dev        # API on 4810, Vite on 4811
 ```
 
 `npm start` serves the built UI from `web/dist`, so run `npm run build` first. Ports start at 4800 so they stay clear of the other demos.
+
+### What to do if the port is taken
+
+Host run: `PORT=4820 npm start` (any free port; `npm run doctor` tells you whether 4810 is free). Docker: `HOST_PORT=4820 docker compose up --build -d`; the container port stays 4810 and only the host side moves. Then open that port, and check `GET /api/health` on it.
 
 ### Scan from the command line
 
@@ -110,7 +119,7 @@ The image runs as a non-root user. Inside the container the server listens on al
 
 ## SE shelf, Learning Hub, browser run
 
-- Shelf: merge `docs/shelf-entry.json` (D3 and D4, one app) into the shelf's `.data/demos.local.json`; it shows Ready from `/api/health`. **Override `composeFile` first:** the committed value is the author's absolute path (`/Users/cmuir/Development/mcp-tools/docker-compose.yml`); replace it, in both entries, with the absolute path of `docker-compose.yml` in your checkout, or the shelf cannot start the stack.
+- Shelf: `docs/shelf-entry.json` registers this app (D3 and D4, one app; tag `mcp-server-built`; it shows Ready from `/api/health`). `composeFile` in it is relative to the shelf's demo root, the folder that holds this checkout as `mcp-tools-LAB`.
 - Learning Hub: `content-pack.json`, regenerate and validate with `npm run content-pack`.
 - Browser run: `npm run build && npm run e2e` (needs a `hostile-mcp` checkout next to this repo; see [docs/packaging.md](docs/packaging.md)).
 - Diagram drag check: `npm run build && npm run diagram-check` drags every box on every run at 1440 and 375 wide and fails if an edge label lands on a box or another label (a real browser; not part of `npm test`).

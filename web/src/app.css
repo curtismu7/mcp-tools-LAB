@@ -1,55 +1,40 @@
-/* Theme tokens. Light by default, dark by system setting, or forced with data-theme. No purple: severity is always a word
-   beside the colour (High, Warn, Info). */
+/* Layout and component rules only. Colours, fonts, controls, the banner and dark mode come from the shared standalone-ui.css,
+   which main.jsx loads first. The tokens below name this app's status colours in terms of the shared ones; no colour is written
+   here. No purple: severity is always a word beside the colour (High, Warn, Info). */
 :root {
-  --bg: #f6f7f9; --card: #ffffff; --border: #d5d9e0; --text: #1c2330; --muted: #566074; --accent: #c8102e; --on-accent: #ffffff;
-  --ok: #1a7f37; --ok-wash: #e6f4ea; --hold: #8a5a00; --hold-wash: #fdf1d6; --deny: #b00b0d; --deny-wash: #fde8e8;
-  --mark: #fff0b3; --mark-text: #3d2e00; --info: #1f5fa8; --info-wash: #e3eefb;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color-scheme: light;
+  --ok: var(--status-ok);
+  --hold: var(--status-warn);
+  --deny: var(--danger-text);
+  --info: var(--status-info);
+  --ok-wash: color-mix(in srgb, var(--status-ok) 14%, var(--surface));
+  --hold-wash: color-mix(in srgb, var(--status-warn) 14%, var(--surface));
+  --deny-wash: var(--accent-soft);
+  --info-wash: color-mix(in srgb, var(--status-info) 12%, var(--surface));
+  --mark: color-mix(in srgb, var(--status-warn) 30%, var(--surface));
+  --mark-text: var(--text);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #12161d; --card: #1a202a; --border: #2f3846; --text: #e6eaf1; --muted: #9aa5b8; --accent: #ff6b7d; --on-accent: #12161d;
-    --ok: #4cc26b; --ok-wash: #10301d; --hold: #e3b341; --hold-wash: #33290d; --deny: #ff7b7b; --deny-wash: #3a1517;
-    --mark: #5a4a00; --mark-text: #fff3c4; --info: #7db3f0; --info-wash: #12283f;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #12161d; --card: #1a202a; --border: #2f3846; --text: #e6eaf1; --muted: #9aa5b8; --accent: #ff6b7d; --on-accent: #12161d;
-  --ok: #4cc26b; --ok-wash: #10301d; --hold: #e3b341; --hold-wash: #33290d; --deny: #ff7b7b; --deny-wash: #3a1517;
-  --mark: #5a4a00; --mark-text: #fff3c4; --info: #7db3f0; --info-wash: #12283f;
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-.page { max-width: 76rem; margin: 0 auto; padding: 1rem; }
+.page { max-width: 76rem; margin: 0 auto; padding: 1rem 0; }
 h1 { margin: 0; font-size: 1.25rem; }
 h2 { margin: 0.5rem 0 0.25rem; font-size: 1.4rem; }
 h3 { margin: 1.25rem 0 0.5rem; font-size: 1.1rem; }
 h4 { margin: 0.5rem 0 0.25rem; font-size: 1rem; }
 .lede, .muted { color: var(--muted); }
 .small { font-size: 0.85rem; }
-a { color: var(--accent); }
-code { font-family: var(--mono); font-size: 0.85rem; overflow-wrap: anywhere; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--status-info); }
+code { font-size: 0.85rem; overflow-wrap: anywhere; }
 
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); background: var(--card); }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); background: var(--surface); }
 .top nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 20rem; }
 .top nav a { padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text); text-decoration: none; border: 1px solid transparent; }
 .top nav a[aria-current="page"] { border-color: var(--accent); font-weight: 600; }
 .theme { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); }
 
-.btn { font: inherit; padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); cursor: pointer; min-height: 2.25rem; }
-.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
-.btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
-.btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
-select, input, textarea { font: inherit; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); max-width: 100%; }
-textarea { width: 100%; font-family: var(--mono); font-size: 0.85rem; }
+textarea { width: 100%; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; }
 input:not([type="checkbox"]):not([type="file"]) { width: 100%; }
+input[type="checkbox"] { min-height: 0; padding: 0; }
 
-.card { padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.card { padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .card.inner { background: var(--bg); margin-top: 0.75rem; }
 .alert { padding: 0.6rem 0.8rem; border-radius: 6px; background: var(--deny-wash); color: var(--deny); border: 1px solid var(--deny); overflow-wrap: anywhere; }
 .ok { padding: 0.6rem 0.8rem; border-radius: 6px; background: var(--ok-wash); color: var(--ok); border: 1px solid var(--ok); }
@@ -71,7 +56,7 @@ label.check { flex-direction: row; align-items: flex-start; gap: 0.5rem; color: 
 .sev--warn { background: var(--hold-wash); color: var(--hold); }
 .sev--info { background: var(--info-wash); color: var(--info); }
 
-.untrusted { font-family: var(--mono); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.untrusted { font-family: var(--font-mono); font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .untrusted--block { margin: 0.4rem 0; padding: 0.6rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); max-height: 22rem; overflow: auto; }
 .untrusted mark { background: var(--mark); color: var(--mark-text); padding: 0 0.1rem; border-radius: 3px; outline: 1px dashed var(--hold); }
 .inv { background: var(--deny-wash); color: var(--deny); border-radius: 3px; padding: 0 0.15rem; font-weight: 600; }
@@ -80,28 +65,26 @@ table.rules { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 table.rules th, table.rules td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 details.card summary { cursor: pointer; font-weight: 600; }
 
-.flow-wrap { height: min(30rem, 70vh); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); }
-.caption { min-height: 3rem; padding: 0.6rem 0.8rem; border-left: 4px solid var(--accent); background: var(--card); }
-.fbox { width: 200px; padding: 0.55rem 0.7rem; border: 2px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.flow-wrap { height: min(30rem, 70vh); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.caption { min-height: 3rem; padding: 0.6rem 0.8rem; border-left: 4px solid var(--accent); background: var(--surface); }
+.fbox { width: 200px; padding: 0.55rem 0.7rem; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.15rem; }
 .fbox strong { font-size: 0.9rem; }
 .fbox span { color: var(--muted); }
 .fbox.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
 .fbox.dim { opacity: 0.55; }
 .react-flow__edge.edge-on path.react-flow__edge-path { stroke: var(--accent); stroke-width: 3; }
 
-@media (max-width: 40rem) { .page { padding: 0.75rem 1rem; } }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 40rem) { .page { padding: 0.75rem 0; } }
 
 /* MT1: pages, tabs, verdict, dialog, skip link */
-.skip { position: absolute; left: -999px; top: 0; padding: 0.5rem 1rem; background: var(--card); color: var(--text); border: 2px solid var(--accent); z-index: 50; }
+.skip { position: absolute; left: -999px; top: 0; padding: 0.5rem 1rem; background: var(--surface); color: var(--text); border: 2px solid var(--accent); z-index: 50; }
 .skip:focus { left: 0.5rem; top: 0.5rem; }
 main:focus { outline: none; }
 .conn-list li { align-items: center; }
 .conn-name { flex: 1 1 14rem; overflow-wrap: anywhere; }
 .okt { color: var(--ok); } .badt { color: var(--deny); }
 .tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
-.tabs .btn[aria-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
-.verdict { padding: 0.8rem 1rem; border-radius: 8px; border: 1px solid var(--border); border-left-width: 6px; background: var(--card); margin-bottom: 1rem; }
+.verdict { padding: 0.8rem 1rem; border-radius: 8px; border: 1px solid var(--border); border-left-width: 6px; background: var(--surface); margin-bottom: 1rem; }
 .verdict__head { margin: 0 0 0.25rem; }
 .verdict--none { border-left-color: var(--info); }
 .verdict--info { border-left-color: var(--info); }
@@ -111,10 +94,9 @@ main:focus { outline: none; }
 .evidence__hit, .evidence mark { background: var(--mark); color: var(--mark-text); padding: 0 0.1rem; border-radius: 3px; outline: 1px dashed var(--hold); }
 .cannot { margin-top: 1rem; border-left: 4px solid var(--hold); }
 .cannot ul { margin: 0.25rem 0 0; padding-left: 1.2rem; }
-.modal-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 1rem; background: rgba(10, 14, 20, 0.6); }
-.modal { width: min(36rem, 100%); max-height: 90vh; overflow: auto; padding: 1.25rem; border: 2px solid var(--accent); border-radius: 10px; background: var(--card); color: var(--text); }
+.modal-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 1rem; background: color-mix(in srgb, var(--box-dark) 60%, transparent); }
+.modal { width: min(36rem, 100%); max-height: 90vh; overflow: auto; padding: 1.25rem; border: 2px solid var(--accent); border-radius: 10px; background: var(--surface); color: var(--text); }
 .modal__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
-.top .btn { min-height: 2rem; }
 @media (max-width: 40rem) { .flow-wrap { height: 24rem; } .story__body { margin-left: 0.5rem; } }
 
 /* Diagram guide: the step detail; its messages are the On the wire panel below. */
@@ -122,10 +104,10 @@ main:focus { outline: none; }
 
 /* On the wire panel: request and response side by side, the token split into its three parts, key claims marked. */
 .wire h4 { margin: 0.5rem 0 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.wire .badge { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; padding: 0 0.35rem; vertical-align: middle; }
+.wire .badge { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; border: 1px solid var(--danger-text); color: var(--danger-text); border-radius: 4px; padding: 0 0.35rem; vertical-align: middle; }
 .wire__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.wire__pre { margin: 0; font-family: var(--mono); font-size: 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.wire__jwt { font-family: var(--mono); font-size: 0.8rem; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0 0 0.5rem; }
+.wire__pre { margin: 0; font-family: var(--font-mono); font-size: 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wire__jwt { font-family: var(--font-mono); font-size: 0.8rem; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0 0 0.5rem; }
 .jwt-h { color: var(--deny); } .jwt-p { color: var(--info); } .jwt-s { color: var(--ok); }
 .wire__focus td { background: var(--hold-wash); }
 .wire__notice { padding: 0.5rem 0.8rem; border-left: 4px solid var(--accent); background: var(--bg); border-radius: 4px; }
