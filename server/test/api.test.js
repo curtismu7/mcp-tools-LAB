@@ -256,3 +256,18 @@ test('responses carry the hardening headers that keep untrusted text inert', T, 
     assert.equal(r.headers.get('x-powered-by'), null);
   });
 });
+
+test('POST /api/reset clears every saved connection (rule 3)', T, async () => {
+  await withApp({}, async ({ call }) => {
+    await call('POST', '/api/connections', { transport: 'http', label: 'reset-me', url: 'http://127.0.0.1:1/mcp' });
+    assert.equal((await (await call('GET', '/api/connections')).json).connections.length, 1);
+    const r = await call('POST', '/api/reset');
+    assert.equal(r.status, 200);
+    assert.equal(r.json.ok, true);
+    assert.equal(r.json.cleared, 1);
+    assert.equal((await (await call('GET', '/api/connections')).json).connections.length, 0);
+    // Resetting again is honest about having nothing to clear.
+    const again = await call('POST', '/api/reset');
+    assert.equal(again.json.cleared, 0);
+  });
+});

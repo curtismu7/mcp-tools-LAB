@@ -108,6 +108,15 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     res.status(204).end();
   }));
 
+  // Reset (rule 3): clears every saved connection in this instance's store. Mock stores
+  // are virtual, so the answer there is honest ("nothing stored").
+  api.post('/reset', wrap(async (_req, res) => {
+    if (store.file === null) return res.json({ ok: true, cleared: 0, note: 'mock-only: nothing is stored' });
+    const ids = store.list().map((c) => c.id);
+    for (const id of ids) await manager.remove(id);
+    res.json({ ok: true, cleared: ids.length, note: 'saved connections removed' });
+  }));
+
   // ---- see: list ---------------------------------------------------------
   api.get('/connections/:id/tools', wrap(async (req, res) => {
     const conn = connection(req, res); if (!conn) return;
