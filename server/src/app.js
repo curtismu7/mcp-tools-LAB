@@ -110,6 +110,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
 
   // Reset (rule 3): clears every saved connection in this instance's store. Mock stores
   // are virtual, so the answer there is honest ("nothing stored").
+  // Reset (rule 3): POST /api/reset clears every saved connection in this instance's store.
   api.post('/reset', wrap(async (_req, res) => {
     if (store.file === null) return res.json({ ok: true, cleared: 0, note: 'mock-only: nothing is stored' });
     const ids = store.list().map((c) => c.id);
