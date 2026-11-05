@@ -1,6 +1,6 @@
 # CLAUDE.md: MCP tools LAB
 
-Tier: Tester. Connect to an MCP server, list what it offers, scan the metadata for poison before an agent ingests it, and only then call tools behind an explicit confirm. Repo: https://github.com/ping-sandbox/mcp-tools-LAB. Read `README.md` and `docs/security.md` first; the rulebook is `~/Development/STANDALONE-RULES.md` (skill `standalone-demo`).
+Tier: Tester. Connect to an MCP server, list what it offers, scan the metadata for poison before an agent ingests it, and only then call tools behind an explicit confirm. Repo: https://github.com/curtismu7/mcp-tools-LAB. Read `README.md` and `docs/security.md` first; the rulebook is `~/Development/STANDALONE-RULES.md` (skill `standalone-demo`).
 
 ## Run and test
 - Needs Node 26 or newer. `npm install`, `npm run doctor`, `npm test` (server `node:test`, web vitest, the forbidden-strings gate test), `npm run build`, `npm start` (`127.0.0.1:4810`, `PORT` to change). Docker: `HOST_PORT=4820 docker compose up --build -d` publishes `127.0.0.1` only. Run suites on the Air (`air-test`), not on this Mac.
