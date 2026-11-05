@@ -10,6 +10,7 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-4810}:4810"
     environment:
+      SHELF_URL: ${SHELF_URL:-}
       PORT: "4810"
       # The browser's Host header is 127.0.0.1:HOST_PORT; the Host check compares names only, so any HOST_PORT works.
     volumes:
