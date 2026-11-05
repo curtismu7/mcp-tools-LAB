@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ShelfLink from "./components/ShelfLink.jsx";
 import { get } from "./lib/api.js";
 import Connect from "./pages/Connect.jsx";
 import Server from "./pages/Server.jsx";
@@ -41,6 +42,7 @@ function Shell() {
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
       <header className="top">
         <h1>MCP tools</h1>
+        <ShelfLink />
         <nav aria-label="Pages">
           {PAGES.map(([id, label, admin]) => (
             <a key={id} href={`#${id}`} aria-current={page === id ? "page" : undefined} data-admin-only={admin ? "" : undefined} onClick={(e) => { e.preventDefault(); setPage(id); }}>{label}</a>

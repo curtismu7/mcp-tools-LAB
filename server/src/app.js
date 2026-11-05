@@ -24,6 +24,7 @@ import { collectFromClient } from './scanner/live.js';
 import { LIMITS, RULES } from './scanner/rules.js';
 import { hostCheck, sameOriginWrites } from './security.js';
 import { createStore } from './store.js';
+import { shelfInfo } from './shelfLink.js';
 
 const WEB_DIST = process.env.WEB_DIST || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -235,6 +236,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   app.use('/api', api);
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
+app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.use(express.static(WEB_DIST));
     app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
