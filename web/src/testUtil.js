@@ -39,6 +39,7 @@ export function mockServer(overrides = {}) {
   calls = [];
   const routes = {
     "GET /api/config": () => ({ scanMaxBytes: 1048576, stdio: true, pingone: { enabled: false } }),
+    "GET /api/info": () => ({ source: "mock", realAvailable: true, realReason: null }),
     "GET /api/connections": () => ({ connections: [{ id: "c1", label: "Evil <b>server</b>", transport: "http", url: "http://127.0.0.1:1/mcp", token: "set" }] }),
     "GET /api/protocol-methods": () => ({ methods: [{ method: "resources/list", description: "List resources", inputSchema: {} }] }),
     "GET /api/connections/c1/tools": () => ({ tools: TOOLS }),

@@ -73,6 +73,23 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     scanMaxBytes: maxScan, stdio: !mock, mockOnly: mock,
     pingone: pingone && !mock ? pingone.status() : { enabled: false },
   }));
+  // Rule 19: the Mock/Real toggle. The mode is server-side and runtime-switchable. Real (the live inspector)
+  // is refused on a MOCK_ONLY=1 hosted copy with 409 and the honest reason; elsewhere it is always available.
+  const modeView = () => ({
+    source: mode === 'real' ? 'real' : 'mock',
+    realAvailable: !mock,
+    ...(mock ? { realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.' } : { realReason: null }),
+  });
+  let mode = 'mock';
+  api.get('/info', (_req, res) => res.set('Cache-Control', 'no-store').json(modeView()));
+  api.post('/mode', small, (req, res) => {
+    const body = req.body ?? {};
+    if (!isObject(body) || Object.keys(body).some((k) => k !== 'source')) return bad(res, 'the only accepted body field is { "source": "mock" | "real" }.');
+    if (body.source !== 'mock' && body.source !== 'real') return bad(res, 'source must be "mock" or "real".');
+    if (body.source === 'real' && mock) return res.status(409).json({ error: 'real_not_available', message: 'Real is not available: this hosted copy is mock only (MOCK_ONLY=1). Every server here is an in-process fixture; set up your own copy without MOCK_ONLY to inspect real servers.', source: 'mock' });
+    mode = body.source === 'real' ? 'real' : 'mock';
+    res.json(modeView());
+  });
   api.get('/rules', (_req, res) => res.json({ rules: Object.entries(RULES).map(([id, r]) => ({ id, ...r })), limits: LIMITS }));
   api.get('/protocol-methods', (_req, res) => res.json({ methods: PROTOCOL_METHODS }));
 

@@ -257,8 +257,52 @@ test('responses carry the hardening headers that keep untrusted text inert', T, 
   });
 });
 
-test('POST /api/reset clears every saved connection (rule 3)', T, async () => {
+// ---------------------------------------------------------------- Rule 19: the Mock/Real toggle
+test('rule 19: GET /api/info has the toggle shape and POST /api/mode switches both directions and back', T, async () => {
   await withApp({}, async ({ call }) => {
+    const i0 = await call('GET', '/api/info');
+    assert.equal(i0.status, 200);
+    assert.deepEqual(i0.json, { source: 'mock', realAvailable: true, realReason: null });
+    const toReal = await call('POST', '/api/mode', { source: 'real' });
+    assert.equal(toReal.status, 200);
+    assert.deepEqual(toReal.json, { source: 'real', realAvailable: true, realReason: null });
+    assert.deepEqual((await call('GET', '/api/info')).json, { source: 'real', realAvailable: true, realReason: null });
+    const back = await call('POST', '/api/mode', { source: 'mock' });
+    assert.equal(back.status, 200);
+    assert.equal(back.json.source, 'mock');
+  });
+});
+
+test('rule 19: on a MOCK_ONLY copy Real is refused with 409 and the honest reason, and the mode never changes', T, async () => {
+  await withApp({ env: { MOCK_ONLY: '1' } }, async ({ call }) => {
+    assert.deepEqual((await call('GET', '/api/info')).json, {
+      source: 'mock', realAvailable: false,
+      realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.',
+    });
+    const r = await call('POST', '/api/mode', { source: 'real' });
+    assert.equal(r.status, 409);
+    assert.equal(r.json.error, 'real_not_available');
+    assert.match(r.json.message, /mock only/);
+    assert.equal(r.json.source, 'mock');
+    assert.equal((await call('GET', '/api/info')).json.source, 'mock', 'a refused switch leaves the mode unchanged');
+    assert.equal((await call('POST', '/api/mode', { source: 'mock' })).status, 200, 'mock stays available');
+  });
+});
+
+test('rule 19: POST /api/mode refuses anything else: other values, extra fields, the old {mode} shape, no body', T, async () => {
+  await withApp({}, async ({ call }) => {
+    for (const body of [{ source: 'live' }, { source: 1 }, { source: null }, { source: ['real'] }, {}, { source: 'mock', extra: 1 }, { mode: 'mock' }]) {
+      const r = await call('POST', '/api/mode', body);
+      assert.equal(r.status, 400, JSON.stringify(body));
+      assert.equal(r.json.error, 'bad_request');
+    }
+    assert.equal((await call('POST', '/api/mode')).status, 400);
+    assert.equal((await call('GET', '/api/mode')).status, 404, 'there is one toggle endpoint, POST /api/mode');
+    assert.equal((await call('POST', '/api/mode', { source: 'real' }, { origin: 'https://evil.example' })).status, 403, 'the switch is a same-origin write like every other');
+  });
+});
+
+test('POST /api/reset clears every saved connection (rule 3)', T, async () => {  await withApp({}, async ({ call }) => {
     await call('POST', '/api/connections', { transport: 'http', label: 'reset-me', url: 'http://127.0.0.1:1/mcp' });
     assert.equal((await (await call('GET', '/api/connections')).json).connections.length, 1);
     const r = await call('POST', '/api/reset');
