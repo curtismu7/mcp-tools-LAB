@@ -34,6 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 26
@@ -45,6 +47,8 @@ jobs:
             export FORBIDDEN_STRINGS_FILE="$RUNNER_TEMP/forbidden-strings.txt"
           fi
           npm run check:forbidden
+      - name: No AI attribution in the tree or recent commits
+        run: bash scripts/check-no-ai-attribution.sh
   gitleaks:
     # Fails the PR if any commit in its history contains a secret.
     runs-on: ubuntu-latest
