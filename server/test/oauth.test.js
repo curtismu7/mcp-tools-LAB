@@ -68,7 +68,7 @@ async function signIn(app, id, body = {}) {
 }
 
 test('isPingHost refuses Ping authorization servers (heuristic) and nothing else', () => {
-  for (const h of ['auth.pingone.com', 'auth.pingone.eu', 'x.pingidentity.com', 'cmuir-pf-acme.ping-devops.com', 'pingfederate.example.com', 'my-pingone.example']) assert.ok(isPingHost(h), h);
+  for (const h of ['auth.pingone.com', 'auth.pingone.eu', 'x.pingidentity.com', 'placeholder.ping-devops.com', 'pingfederate.example.com', 'my-pingone.example']) assert.ok(isPingHost(h), h);
   for (const h of ['auth.example.com', 'login.microsoftonline.com', 'accounts.google.com', 'shopping.example', 'ping.example']) assert.ok(!isPingHost(h), h);
   assert.deepEqual(parseChallenge('Bearer resource_metadata="https://a/b", scope="x y"'), { resource_metadata: 'https://a/b', scope: 'x y' });
 });
