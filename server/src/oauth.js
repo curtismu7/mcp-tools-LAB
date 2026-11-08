@@ -18,6 +18,7 @@ import crypto from 'node:crypto';
 import { p1Config, sameIssuer } from './p1config.js';
 import { createPiFlow } from './piflow.js';
 import { isLoopbackHost } from './security.js';
+import { identityFrom } from './fill.js';
 
 const TIMEOUT_MS = 10_000;
 const MAX_BYTES = 64 * 1024;
@@ -187,6 +188,8 @@ export function createOAuth({ env = {} } = {}) {
       const s = sessions.get(connectionId);
       return { signedIn: Boolean(s && s.expiresAt > Date.now()), issuer: s?.issuer ?? null, scope: s?.scope ?? null, expiresAt: s?.expiresAt ?? null, canRefresh: Boolean(s?.refreshToken), pending: [...pending.values()].some((p) => p.connectionId === connectionId) };
     },
+    // Who is signed in (claims only), for filling the call form; null when not signed in or the token is not a JWT.
+    identity: (connectionId) => { const s = sessions.get(connectionId); return s && s.expiresAt > Date.now() ? identityFrom(s.accessToken) : null; },
     secrets: (connectionId) => { const s = sessions.get(connectionId); return s ? [s.accessToken, s.refreshToken, s.clientSecret].filter(Boolean) : []; },
     signOut(connectionId) { sessions.delete(connectionId); discovered.delete(connectionId); for (const [k, p] of pending) if (p.connectionId === connectionId) pending.delete(k); },
     clear() { sessions.clear(); pending.clear(); discovered.clear(); piflow.clear(); },

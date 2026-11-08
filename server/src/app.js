@@ -19,6 +19,7 @@ import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
 import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } from './mock.js';
 import { createPingone } from './pingone.js';
+import { createFill } from './fill.js';
 import { createFlagStore, FlagError } from './flags.js';
 import { createOAuth, OAuthError } from './oauth.js';
 import { PiFlowError } from './piflow.js';
@@ -40,6 +41,7 @@ const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 export function createApp({ env = process.env, store = mockOnly(env) ? createMockStore() : createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null, knownServers = listKnownServers } = {}) {
   const mock = mockOnly(env);
   if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
+  const fill = createFill();
   const oauth = createOAuth({ env }); // OAuth sign-ins: pi.flow for our PingOne, browser redirect for third parties; tokens in memory only
   const manager = createManager({ store, pingone: mock ? null : pingone, mock, oauth });
   // Saved inputs live next to the connections file (memory only when the store is virtual).
@@ -204,6 +206,13 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
 
   // A signed-in OAuth token that is about to expire is refreshed before any route that talks to that server.
   api.use('/connections/:id', (req, _res, next) => { oauth.fresh(req.params.id).then(() => next(), next); });
+
+  // What the call form may fill in: our demo values for this server and who is signed in (claims, never the token).
+  api.get('/connections/:id/fill', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    const identity = conn.transport === 'pingone' ? pingone?.identity?.() ?? null : oauth.identity(conn.id);
+    res.set('Cache-Control', 'no-store').json({ demo: mock ? {} : fill.demoFor(conn), identity });
+  });
 
   // ---- OAuth sign-in for a third-party server (rule-16 exception; Ping hosts refused) -------------------------
   const oauthConn = (req, res) => {

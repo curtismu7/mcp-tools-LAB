@@ -1,0 +1,13 @@
+{
+  "schema": "sample-values/1",
+  "_comment": "Demo values for fields a person would not know, per server in known-servers.json (matched by URL). Plain sample text only: no ids (our servers make those at runtime; the call form's Pick looks them up), no secrets, no real people.",
+  "servers": {
+    "hostile-mcp": { "city": "Austin", "symbol": "AAPL", "username": "demo-user", "user": "demo-user", "account": "demo-checking" },
+    "banking-mcp": { "city": "Austin", "symbol": "AAPL", "account_type": "CHECKING", "amount": 25, "currency": "USD", "description": "Demo transfer from MCP tools", "query": "coffee" },
+    "banking-resource-server": { "symbol": "AAPL", "query": "demo" },
+    "weather": { "city_name": "Austin", "query": "Austin" },
+    "brave": { "query": "Model Context Protocol" },
+    "audit": { "query": "sign-on", "days": 7 },
+    "everything": { "message": "hello from MCP tools", "a": 2, "b": 3 }
+  }
+}

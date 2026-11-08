@@ -7,6 +7,7 @@
 // PINGONE_REGION, PINGONE_MCP_CLIENT_ID). The token stays in process memory and is never returned by any API.
 import { p1Config } from './p1config.js';
 import { createPiFlow } from './piflow.js';
+import { identityFrom } from './fill.js';
 
 export function createPingone({ env = process.env, port }) {
   let token = null; // { accessToken, expiresAt }
@@ -26,6 +27,7 @@ export function createPingone({ env = process.env, port }) {
       return token.accessToken;
     },
     secrets: () => (token ? [token.accessToken] : []),
+    identity: () => (signedIn() ? identityFrom(token.accessToken) : null),
     // pi.flow: opens the flow and returns an opaque run handle; credentials() finishes it.
     startLogin: () => piflow.start({
       key: 'pingone', meta: { issuer: p1.issuer, authorizationEndpoint: `${p1.issuer}/authorize`, tokenEndpoint: `${p1.issuer}/token` },
