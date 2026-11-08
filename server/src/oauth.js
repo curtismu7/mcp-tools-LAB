@@ -32,6 +32,29 @@ export function isPingHost(host) {
   return /(^|\.)(pingone\.[a-z.]+|pingidentity\.com|ping-devops\.com|pingone\.com)$/.test(h) || /(^|[.-])pingone([.-]|$)|pingfederate/.test(h);
 }
 
+// Our PingOne does not honour an unknown `resource`: it issues a token for its own API audience instead (measured
+// 2026-11-08). A token is kept and sent only if EVERY audience in it is the server it is about to be sent to: a list that
+// also names another API (PingOne's own) is just as usable there, so it is refused too. Only the payload is read (the
+// server never sees this token, so no signature is checked); an opaque token cannot be checked and is refused.
+function trimSlashes(str) { let e = str.length; while (e > 0 && str.charCodeAt(e - 1) === 47) e -= 1; return str.slice(0, e); } // no regex: a long run of slashes stays linear
+// For messages only: no query string or fragment (connection URLs may carry secrets there), printable ASCII only.
+function shown(raw, max) {
+  let t = String(raw);
+  try { const u = new URL(t); t = u.origin + u.pathname; } catch { /* not a URL: show it clipped */ }
+  return t.slice(0, max).replace(/[^\x20-\x7e]/g, '?');
+}
+export function checkAudience(accessToken, resource) {
+  const norm = (str) => trimSlashes(String(str));
+  let aud;
+  try { aud = JSON.parse(Buffer.from(String(accessToken).split('.')[1] || '', 'base64url').toString('utf8')).aud; } catch { aud = undefined; }
+  const list = Array.isArray(aud) ? aud : [aud];
+  const auds = list.filter((a) => typeof a === 'string');
+  if (auds.length === 0 || auds.length !== list.length || !auds.every((a) => norm(a) === norm(resource))) {
+    const seen = auds.length ? auds.slice(0, 5).map((a) => shown(a, 80)).join(', ') : 'none readable';
+    throw new OAuthError(`our PingOne issued a token for a different audience (${seen}), not only for this server (${shown(resource, 120)}), so it was not kept or sent. Define this server's URL as a resource in the PingOne environment, then sign in again.`, 'oauth_audience_mismatch');
+  }
+}
+
 function checkedUrl(raw, what) {
   let u;
   try { u = new URL(String(raw)); } catch { throw new OAuthError(`${what} is not a valid URL`); }
@@ -190,6 +213,7 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
     if (!s.refreshToken) { sessions.delete(connectionId); return; }
     try {
       const t = await tokenRequest(s, { grant_type: 'refresh_token', refresh_token: s.refreshToken });
+      if (s.audCheck) checkAudience(t.access_token, s.resource); // a refresh may not widen what the first token was checked for
       Object.assign(s, { accessToken: t.access_token, refreshToken: typeof t.refresh_token === 'string' ? t.refresh_token : s.refreshToken, expiresAt: Date.now() + (Number(t.expires_in) > 0 ? Number(t.expires_in) : 3600) * 1000 });
     } catch { sessions.delete(connectionId); }
   }
@@ -205,8 +229,8 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
     // openid) are requested, whatever the server asks for.
     const allowed = new Set(String(env.MCPTOOLS_P1_SCOPES || '').split(/[\s,]+/).filter(Boolean));
     const scope = ['openid', ...info.scopes.filter((x) => x !== 'openid' && allowed.has(x))].join(' ');
-    const base = { issuer: info.issuer, clientId: p1.clientId, clientSecret: null, tokenEndpoint: info.tokenEndpoint, resource: info.resource, scope };
-    return piflow.start({ key: conn.id, meta: { issuer: info.issuer, authorizationEndpoint: info.authorizationEndpoint, tokenEndpoint: info.tokenEndpoint }, clientId: p1.clientId, redirectUri, resource: info.resource, scope, onTokens: (id, t) => keep(id, t, base) });
+    const base = { issuer: info.issuer, clientId: p1.clientId, clientSecret: null, tokenEndpoint: info.tokenEndpoint, resource: info.resource, scope, audCheck: true };
+    return piflow.start({ key: conn.id, meta: { issuer: info.issuer, authorizationEndpoint: info.authorizationEndpoint, tokenEndpoint: info.tokenEndpoint }, clientId: p1.clientId, redirectUri, resource: info.resource, scope, onTokens: (id, t) => { checkAudience(t.access_token, info.resource); keep(id, t, base); } });
   }
 
   return {
