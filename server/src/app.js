@@ -390,7 +390,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     console.error('[mcp-tools] api error:', err.code || err.name);
     return res.status(500).json({ error: 'server_error' });
   });
-  app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
+  app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo(env)); }); // the header "Shelf" button
   app.use('/api', api);
   app.use('/proxy', liveProxy.proxy); // MCP clients send no Origin: the proxy has its own guards (proxy/router.js)
 
