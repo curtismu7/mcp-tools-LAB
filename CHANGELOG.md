@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added: a server that answers initialize and tools/list anonymously but refuses `tools/call` (the Banking MCP server) now gets the OAuth sign-in. A 401 Bearer challenge on a call is remembered, the sign-in card appears, and you run the call again after signing in.
 - Changed: the Entitled listing banner and docs now say which gateway version was measured. Our SE gateway runs `v1.261106` (after the 2026-11-02 release), and Real measured the listing and the cap on it; per-caller entitlement is still UNVERIFIED (one agent key). Added the optional `MCP_TOOLS_GW_VERSION` label, shown on the Real tab. Removed the old "SE gateway is v1.261030 and does not have it" statements.
 - Added: `MCPTOOLS_P1_RESOURCES=<server URL>=<audience>` lets one connection URL sign in to our PingOne for the one audience its metadata names (for example the Banking MCP server's `mcp-invest.ping.demo`); a server alone still cannot choose an audience, and the issued token's audience is checked as before. `MCPTOOLS_P1_SCOPES` and this setting can now live in `~/Development/.env`.
 - Fixed: after pi.flow sign-in and every refresh the token is kept and sent only if every audience in it is the server (PingOne ignores an unknown resource and issues its own API audience); error text omits URL queries.

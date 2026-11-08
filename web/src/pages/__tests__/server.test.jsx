@@ -258,6 +258,45 @@ describe("Server page: Run on a tool card", () => {
     expect(screen.queryByTestId("inline-run")).toBeNull();
   });
 
+  it("a call refused with a 401 sign-in challenge brings up the OAuth panel and says what to do", async () => {
+    let wants = false;
+    mockServer({
+      "GET /api/connections/c1/oauth": () => (wants ? { required: true, signedIn: false, issuer: "https://auth.example.com", scopes: [], dynamicRegistration: true, refused: null, redirectUri: "http://127.0.0.1:4810/api/oauth/callback" } : { required: false, signedIn: false }),
+      "POST /api/connections/c1/call": () => { wants = true; return { __status: 401, body: { error: "mcp_signin_needed", message: "This server wants a sign-in. Use the OAuth sign-in on this page, then try again." } }; },
+    });
+    const user = userEvent.setup();
+    await openServer(user);
+    await user.click(screen.getByRole("button", { name: "Scan" }));
+    await screen.findByTestId("scan-result");
+    expect(screen.queryByTestId("oauth")).toBeNull(); // the server looked open until now
+    await user.click(await screen.findByRole("button", { name: "Run get_weather" }));
+    const card = screen.getByTestId("inline-run");
+    await user.type(within(card).getByLabelText(/^city/), "Paris");
+    await user.click(within(card).getByRole("button", { name: "Review call" }));
+    await user.click(await screen.findByRole("button", { name: "Send call" }));
+    expect(await within(card).findByText(/wants a sign-in/)).toBeInTheDocument();
+    expect(await screen.findByTestId("oauth")).toBeInTheDocument();
+    expect(sent("GET /api/connections/c1/oauth").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the same sign-in prompt appears when the call is made from the Call a tool panel", async () => {
+    let wants = false;
+    mockServer({
+      "GET /api/connections/c1/oauth": () => (wants ? { required: true, signedIn: false, issuer: "https://auth.example.com", scopes: [], dynamicRegistration: true, refused: null, redirectUri: "http://127.0.0.1:4810/api/oauth/callback" } : { required: false, signedIn: false }),
+      "POST /api/connections/c1/call": () => { wants = true; return { __status: 401, body: { error: "mcp_signin_needed", message: "This server wants a sign-in. Use the OAuth sign-in on this page, then try again." } }; },
+    });
+    const user = userEvent.setup();
+    await openServer(user);
+    await user.click(screen.getByRole("button", { name: "Scan" }));
+    await screen.findByTestId("scan-result");
+    await user.selectOptions(screen.getByLabelText("Tool"), "get_weather");
+    await user.type(screen.getByLabelText(/^city/), "Oslo");
+    await user.click(screen.getByRole("button", { name: "Review call" }));
+    await user.click(await screen.findByRole("button", { name: "Send call" }));
+    expect(await screen.findByText(/wants a sign-in/)).toBeInTheDocument();
+    expect(await screen.findByTestId("oauth")).toBeInTheDocument();
+  });
+
   it("before a scan the card offers Scan now; one card is open at a time", async () => {
     mockServer({ "POST /api/connections/c1/scan": () => ({ report: REPORT, listed: { tools: TOOLS, resources: [], prompts: [] } }) });
     const user = userEvent.setup();

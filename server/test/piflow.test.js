@@ -14,9 +14,9 @@ const readBody = (req) => new Promise((r) => { let b = ''; req.on('data', (c) =>
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const PASSWORD = 'Pa55-word-never-logged';
 
-// aud: the audience put in the access token (default: the resource asked for, as a PingOne that knows it; 'opaque' = a non-JWT token;
+// lazy: only tools/call needs a token. aud: the audience put in the access token (default: the resource asked for, as a PingOne that knows it; 'opaque' = a non-JWT token;
 // a function gets the resource). refreshAud: same for a refreshed token (turns on refresh_token and a 20 s lifetime).
-async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read'], scopeChallenge, wrongState = false, omitState = false, otp = false, aud, refreshAud } = {}) {
+async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read'], scopeChallenge, wrongState = false, omitState = false, otp = false, aud, refreshAud, lazy = false } = {}) {
   const st = { flows: new Map(), codes: new Map(), tokens: new Set(), seen: [] };
   let base;
   const p1 = await listen(async (req, res) => {
@@ -76,8 +76,9 @@ async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read
     if (u.pathname === '/.well-known/oauth-protected-resource') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ resource: resource || `${mcpBase}/mcp`, authorization_servers: [`${base}/env-1/as`], scopes_supported: scopes }));
     const body = await readBody(req);
     if (req.headers.authorization) (st.bearers ||= []).push(req.headers.authorization);
-    if (!st.tokens.has(String(req.headers.authorization || '').replace(/^Bearer /, ''))) return res.writeHead(401, { 'www-authenticate': `Bearer resource_metadata="${mcpBase}/.well-known/oauth-protected-resource"` }).end();
     const msg = JSON.parse(body || '{}');
+    const open = lazy && msg.method !== 'tools/call'; // lazy: only tools/call needs a token (like the Banking MCP server)
+    if (!open && !st.tokens.has(String(req.headers.authorization || '').replace(/^Bearer /, ''))) return res.writeHead(401, { 'www-authenticate': `Bearer resource_metadata="${mcpBase}/.well-known/oauth-protected-resource"` }).end();
     if (msg.id === undefined) return res.writeHead(202).end();
     const result = msg.method === 'initialize' ? { protocolVersion: '2025-06-18', serverInfo: { name: 'p1-protected', version: '1' }, capabilities: { tools: {} } } : { tools: [{ name: 'p1_tool', description: 'd', inputSchema: { type: 'object' } }] };
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
@@ -430,4 +431,22 @@ test('parseResourceMap: URL=audience pairs, last = splits, junk and Ping API aud
   assert.equal(parseResourceMap('http://a/mcp=https://api.pingone.com. http://b/mcp=api.pingone.com. http://c/mcp=api.pingone.com:443 http://d/mcp=urn:x:pingone http://e/mcp=pingone:api http://f/mcp=PINGONE').size, 0, 'Ping API audiences are dropped in every spelling');
   assert.equal(parseResourceMap('').size, 0); assert.equal(parseResourceMap(undefined).size, 0);
   assert.equal(parseResourceMap(`http://h/mcp=${'a'.repeat(201)}`).size, 0, 'an over-long audience is skipped');
+});
+
+test('our PingOne: a server that guards only tools/call is signed in to after its 401, by pi.flow', T, async () => {
+  const w = await fakeP1({ lazy: true });
+  const app = await startApp({ env: { MCPTOOLS_P1_ISSUER: w.issuer, PINGONE_MCP_CLIENT_ID: 'p1-mcp-client' } });
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, false);
+    const call = async () => { const pre = await app.call('POST', `/api/connections/${id}/call/preview`, { tool: 'p1_tool', arguments: {} }); return app.call('POST', `/api/connections/${id}/call`, { tool: 'p1_tool', arguments: {}, confirm: true, argsHash: pre.json.argsHash }); };
+    const denied = await call();
+    assert.equal(denied.status, 401); assert.equal(denied.json.error, 'mcp_signin_needed');
+    const s = (await app.call('GET', `/api/connections/${id}/oauth`)).json;
+    assert.equal(s.required, true); assert.equal(s.method, 'piflow');
+    const run = (await app.call('POST', `/api/connections/${id}/oauth/piflow`, {})).json;
+    assert.equal((await app.call('POST', `/api/connections/${id}/oauth/piflow/credentials`, { run: run.run, username: 'alice', password: PASSWORD })).json.state, 'signed_in');
+    assert.equal((await call()).status, 200);
+    assert.ok(w.st.bearers.length > 0);
+  } finally { await app.close(); }
 });

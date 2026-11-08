@@ -26,6 +26,7 @@ function fieldText(tool, field) {
 
 export default function Server({ conn, scan, onScanned, onMissing, mockOnly = false }) {
   const [tab, setTab] = useState("tools");
+  const [authCheck, setAuthCheck] = useState(0); // bumped when a call is refused with a 401: the OAuth panel asks again
   const [tools, setTools] = useState(scan?.listed.tools || null);
   const [others, setOthers] = useState(scan ? { resources: scan.listed.resources, prompts: scan.listed.prompts } : null);
   const [err, setErr] = useState(null);
@@ -127,7 +128,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
       <h2>Server: <Untrusted text={conn.label} /></h2>
       <p className="lede">{conn.transport === "http" ? <Untrusted text={conn.url} /> : conn.transport}{conn.token === "set" ? " · token set" : ""}</p>
       {conn.transport === "pingone" && !mockOnly && <PingOnePanel onSignedIn={() => { setTools(null); list(); }} />}
-      {conn.transport === "http" && !mockOnly && <OAuthPanel conn={conn} onSignedIn={() => { setTools(null); list(); }} />}
+      {conn.transport === "http" && !mockOnly && <OAuthPanel conn={conn} recheck={authCheck} onSignedIn={() => { setTools(null); list(); }} />}
       {!scan && <p className="notice" data-testid="scan-banner"><strong>Scan before first use.</strong> This connection has not been scanned. What is listed below is what an agent would be given as trusted context. Press Scan before you call anything.</p>}
       {(changed.length > 0 || scanCover === "older") && (
         <p className="alert" role="alert" data-testid="changed">
@@ -185,7 +186,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
                       </div>
                       {running === t.name && (
                         <div className="inline-run" data-testid="inline-run">
-                          <CallPanel key={t.name} connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} fixedTool={t.name} />
+                          <CallPanel onSignInNeeded={() => setAuthCheck((n) => n + 1)} key={t.name} connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} fixedTool={t.name} />
                         </div>
                       )}
                       <FlagControl kind="tool" name={t.name} flag={flagOf("tool", t.name)} {...flagProps} />
@@ -221,7 +222,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
 
       <h3>Call a tool</h3>
       <div className="card">
-        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
+        <CallPanel onSignInNeeded={() => setAuthCheck((n) => n + 1)} connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
       </div>
 
       <details className="card" data-admin-only>

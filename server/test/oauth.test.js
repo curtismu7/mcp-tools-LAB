@@ -117,3 +117,126 @@ test('a MOCK_ONLY copy refuses OAuth', T, async () => {
   const app = await startApp({ env: { MOCK_ONLY: '1' } });
   try { assert.equal((await app.call('GET', '/api/connections/mock-sample/oauth')).status, 403); } finally { await app.close(); }
 });
+
+// A server that answers initialize and tools/list anonymously and 401s only tools/call: the discovery probe sees no need for
+// a token, so the 401 of a real call is what tells the tool to offer the sign-in.
+const callOf = async (app, id, tool = 'whoami') => {
+  const pre = await app.call('POST', `/api/connections/${id}/call/preview`, { tool, arguments: {} });
+  return app.call('POST', `/api/connections/${id}/call`, { tool, arguments: {}, confirm: true, argsHash: pre.json.argsHash });
+};
+
+test('a 401 on a call makes the tool offer the sign-in; after it, the same call works', T, async () => {
+  const w = await world({ lazy: true });
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp, label: 'lazy' })).json.connection.id;
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, false, 'the probe sees nothing to sign in to');
+    assert.equal((await app.call('GET', `/api/connections/${id}/tools`)).status, 200, 'listing needs no token');
+    const denied = await callOf(app, id);
+    assert.equal(denied.status, 401); assert.equal(denied.json.error, 'mcp_signin_needed'); assert.match(denied.json.message, /sign-in/);
+    const s = (await app.call('GET', `/api/connections/${id}/oauth`)).json;
+    assert.equal(s.required, true); assert.equal(s.signedIn, false); assert.equal(s.method, 'redirect'); assert.equal(s.issuer, w.as);
+    const done = await signIn(app, id);
+    assert.equal(done.cb.status, 200);
+    const ok = await callOf(app, id);
+    assert.equal(ok.status, 200); assert.match(w.st.mcpAuth.at(-1), /^Bearer access-secret-/, 'the server received the token');
+    assert.ok(!ok.text.includes(w.st.mcpAuth.at(-1).replace('Bearer ', '')), 'and the reply does not echo it back');
+  } finally { await app.close(); }
+});
+
+test('the remembered challenge survives a sign-out, but not deleting the connection; only a Bearer challenge counts', T, async () => {
+  const w = await world({ lazy: true });
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    await callOf(app, id);
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, true);
+    await app.call('POST', `/api/connections/${id}/oauth/signout`);
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, true, 'sign-out keeps it');
+  } finally { await app.close(); }
+  const basic = await world({ lazy: true, challenge: 'Basic realm="x"' });
+  const app2 = await startApp();
+  try {
+    const id = (await app2.call('POST', '/api/connections', { transport: 'http', url: basic.mcp })).json.connection.id;
+    const r = await callOf(app2, id);
+    assert.equal(r.json.error, 'mcp_http_error'); assert.equal(r.status, 502);
+    assert.equal((await app2.call('GET', `/api/connections/${id}/oauth`)).json.required, false);
+  } finally { await app2.close(); }
+});
+
+test('a saved token that is refused stays an ordinary error: signing in would not replace it', T, async () => {
+  const w = await world({ lazy: true });
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp, token: 'Bearer saved-but-wrong' })).json.connection.id;
+    const r = await callOf(app, id);
+    assert.equal(r.json.error, 'mcp_http_error'); assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, false);
+  } finally { await app.close(); }
+});
+
+test('a signed-in token that is refused is an ordinary error, not "sign in needed" (the card could not help)', T, async () => {
+  const w = await world({ lazy: true });
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    assert.equal((await callOf(app, id)).json.error, 'mcp_signin_needed');
+    await signIn(app, id);
+    assert.equal((await callOf(app, id)).status, 200);
+    w.st.tokens.clear(); // the server stops accepting the token
+    const r = await callOf(app, id);
+    assert.equal(r.json.error, 'mcp_http_error'); assert.match(r.json.message, /401/);
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, true);
+  } finally { await app.close(); }
+});
+
+test('a challenge whose metadata cannot be reached is an ordinary error (the page would have nothing to show)', T, async () => {
+  const w = await world({ lazy: true, challenge: 'Bearer resource_metadata="http://127.0.0.1:1/nope"' });
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    const r = await callOf(app, id);
+    assert.equal(r.json.error, 'mcp_http_error');
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, false, 'no card is promised');
+  } finally { await app.close(); }
+});
+
+test('a call that goes through with no credential proves the server needs none: the challenge is forgotten', T, async () => {
+  const w = await world({ lazy: true });
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    assert.equal((await callOf(app, id)).json.error, 'mcp_signin_needed');
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, true);
+    assert.equal((await app.call('POST', `/api/connections/${id}/rpc`, { method: 'resources/list' })).status, 200); // listing succeeds anonymously: that proves nothing about calls
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, true);
+    w.st.open = true;
+    assert.equal((await callOf(app, id)).status, 200);
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.required, false);
+  } finally { await app.close(); }
+});
+
+test('the remembered challenge lives one hour, survives sign-out, and goes with a deleted connection or a reset', T, async () => {
+  const { createOAuth } = await import('../src/oauth.js');
+  const w = await world({ lazy: true });
+  const header = `Bearer resource_metadata="${w.mcpBase}/.well-known/oauth-protected-resource"`;
+  let t = Date.now();
+  const o = createOAuth({ env: {}, now: () => t });
+  const conn = { id: 'c-lazy', url: w.mcp };
+  const required = async () => (await o.discover(conn, { fresh: true })).required;
+  assert.equal(await required(), false);
+  assert.equal(o.noteChallenge('c-lazy', header), true); assert.equal(await required(), true);
+  o.signOut('c-lazy'); assert.equal(await required(), true, 'sign-out keeps it');
+  t += 59 * 60 * 1000; assert.equal(await required(), true);
+  t += 2 * 60 * 1000; assert.equal(await required(), false, 'expired after an hour');
+  o.noteChallenge('c-lazy', header); o.signOut('c-lazy', { forget: true }); assert.equal(await required(), false, 'forgotten');
+  o.noteChallenge('c-lazy', header); o.clear(); assert.equal(await required(), false, 'reset');
+  assert.equal(o.noteChallenge('c-lazy', 'Basic realm="x"'), false); assert.equal(o.noteChallenge('c-lazy', undefined), false);
+  // the DELETE route forgets it
+  const app = await startApp();
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    assert.equal((await callOf(app, id)).json.error, 'mcp_signin_needed');
+    assert.equal((await app.call('DELETE', `/api/connections/${id}`)).status, 204);
+    assert.equal((await app.app.locals.oauth.discover({ id, url: w.mcp }, { fresh: true })).required, false);
+  } finally { await app.close(); }
+});
