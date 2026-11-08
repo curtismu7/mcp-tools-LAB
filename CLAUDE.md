@@ -15,6 +15,7 @@ Tier: Tester. Connect to an MCP server, list what it offers, scan the metadata f
 - The forbidden-strings gate (`npm run check:forbidden`, CI job `forbidden-strings`, secret `FORBIDDEN_STRINGS`) prints counts only. CI is GitHub-hosted, Node 26 only: build, forbidden-strings, gitleaks. Docker is OrbStack, never Docker Desktop. The SE k8s mock build is deferred.
 - No AI attribution anywhere (owner, 2026-11-07): no Co-Authored-By trailer and no "Generated with" line in commits, PR bodies or files; CI runs `scripts/check-no-ai-attribution.sh`.
 - Live proxy (`server/src/proxy/`): off by default, per-session proxy token, cross-site Origin refused, the client's Authorization never forwarded, neither token logged, Mock = fixtures only. It bypasses the confirm gate by design; keep the docs saying so.
+- Saved inputs (`server/src/inputs.js`) only fill the call form; never let one send a call without Review + confirm. Token counts are characters / 4 and must always be labelled as an estimate.
 
 ## Shelf
 `docs/shelf-entry.json` registers the app (D3 and D4, one app; tag `mcp-server-built`).

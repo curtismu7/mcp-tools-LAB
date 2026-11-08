@@ -42,7 +42,16 @@ export default function Proxy({ modeSource }) {
     if (r.ok) setInfo(r.data); else setErr(r.data?.message || `Refused (${r.status}).`);
   }
   async function clear() { await del("/api/proxy/flows"); setOpen(null); poll(); }
-  async function show(id) { const r = await get(`/api/proxy/flows/${id}`); if (r.ok) setOpen(r.data.flow); else setErr(r.data?.message || "That flow is gone."); }
+  async function show(id) { setSaveNote(""); const r = await get(`/api/proxy/flows/${id}`); if (r.ok) setOpen(r.data.flow); else setErr(r.data?.message || "That flow is gone."); }
+  // A captured tools/call can become a saved input of that connection (fixtures are not saved connections).
+  const callOf = (f) => { const j = f?.request?.body?.json; return f?.rpcMethod === "tools/call" && !f.request.body.truncated && j?.params && typeof j.params.name === "string" ? j.params : null; };
+  const savable = (f) => info?.routes?.some((r) => r.id === f.route && r.transport !== "mock");
+  const [saveNote, setSaveNote] = useState("");
+  async function saveFlow(f) {
+    const p = callOf(f);
+    const r = await post(`/api/connections/${encodeURIComponent(f.route)}/inputs`, { tool: p.name, name: `from flow #${f.id}`, arguments: p.arguments && typeof p.arguments === "object" && !Array.isArray(p.arguments) ? p.arguments : {}, source: "flow" });
+    setSaveNote(r.ok ? `Saved as "${r.data.input.name}" for ${p.name}. Open the server on the Server page to load it into the call form.` : r.data?.message || `Could not save (${r.status}).`);
+  }
   async function copy(text, what) {
     try { await navigator.clipboard.writeText(text); setCopied(what); } catch { setCopied(""); }
   }
@@ -113,6 +122,13 @@ export default function Proxy({ modeSource }) {
             <button type="button" className="btn" onClick={() => setOpen(null)}>Close</button>
           </div>
           {open.error && <p className="alert" role="alert"><Untrusted text={open.error} /></p>}
+          {callOf(open) && (
+            <div className="controls">
+              <button type="button" className="btn" onClick={() => saveFlow(open)} disabled={!savable(open)} title={savable(open) ? undefined : "Only calls to a saved connection (Real mode) can be saved as inputs."} data-testid="save-flow">Save as input</button>
+              {!savable(open) && <span className="muted small">Only calls to a saved connection (Real mode) can be saved as inputs.</span>}
+              {saveNote && <span className="small" role="status"><Untrusted text={saveNote} /></span>}
+            </div>
+          )}
           <div className="proxy__cols">
             <section><h4>Request</h4><Headers headers={open.request?.headers} /><Body body={open.request?.body} /></section>
             <section><h4>Response</h4>{open.response ? <><Headers headers={open.response.headers} /><Body body={open.response.body} /></> : <p className="muted small">No response yet.</p>}</section>

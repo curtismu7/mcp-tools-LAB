@@ -51,6 +51,11 @@ The Live proxy page turns this tool into a local debugging passthrough, so you c
 - The log keeps the last 200 flows in memory only, bodies capped at 64 KB. Token counts are characters / 4, an estimate and not a tokenizer.
 - Not built: one aggregate URL for all servers, and running OAuth for the client (a server that needs an OAuth sign-in has to be saved with a token first).
 
+### Saved inputs and token estimates
+
+- **Saved inputs:** on the Server page, after picking a tool, give the current arguments a name and press Save input; Load puts them back in the form. A `tools/call` captured by the live proxy can be saved the same way (Save as input in the flow detail, Real mode, saved connections only). Loading only fills the form: Review call and the confirm step still apply. They live in `inputs.json` next to `connections.json` (mode 600), at most 50 per connection, and go when the connection is deleted or on Reset. A mock-only copy refuses to save them.
+- **Token estimates:** each tool, resource and prompt shows `~N tokens`, the Tools tab shows what the whole `tools/list` costs an agent's context before it calls anything, and a call result shows its own cost. The proxy's flow log shows both directions. All are characters / 4: an estimate, not a tokenizer.
+
 Checked by hand on 2026-11-07: the official MCP Inspector CLI (`@modelcontextprotocol/inspector` 2.14.0, `--cli --transport http --header`) listed tools and called a tool through the proxy, and was refused without the token.
 
 ## Run it

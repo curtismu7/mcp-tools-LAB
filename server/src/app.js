@@ -19,6 +19,7 @@ import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
 import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } from './mock.js';
 import { createPingone } from './pingone.js';
+import { createInputStore, InputError } from './inputs.js';
 import { createProxy } from './proxy/router.js';
 import { clip, scrub, scrubJson } from './redact.js';
 import { analyze, buildReport, parseSnapshot, SnapshotError } from './scanner/index.js';
@@ -37,6 +38,8 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   const mock = mockOnly(env);
   if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
   const manager = createManager({ store, pingone: mock ? null : pingone, mock });
+  // Saved inputs live next to the connections file (memory only when the store is virtual).
+  const inputs = createInputStore({ dir: store.file ? path.dirname(store.file) : null, connectionExists: (id) => Boolean(store.get(id)) });
   const maxScan = scanMaxBytes(env);
   const app = express();
   app.disable('x-powered-by');
@@ -134,6 +137,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   }));
   api.delete('/connections/:id', wrap(async (req, res) => {
     if (!(await manager.remove(req.params.id))) return bad(res, 'no such connection', 404);
+    inputs.removeFor(req.params.id);
     res.status(204).end();
   }));
 
@@ -142,11 +146,31 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   // Reset (rule 3): POST /api/reset clears every saved connection in this instance's store.
   api.post('/reset', wrap(async (_req, res) => {
     liveProxy.reset(); // proxy off, its token gone, flow log cleared
+    inputs.clear();
     if (store.file === null) return res.json({ ok: true, cleared: 0, note: 'mock-only: nothing is stored' });
     const ids = store.list().map((c) => c.id);
     for (const id of ids) await manager.remove(id);
     res.json({ ok: true, cleared: ids.length, note: 'saved connections removed' });
   }));
+
+  // ---- saved inputs: named argument sets per tool. Loading one fills the call form; the confirm gate still applies.
+  api.get('/connections/:id/inputs', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    const tool = typeof req.query.tool === 'string' ? req.query.tool : undefined;
+    res.set('Cache-Control', 'no-store').json({ inputs: inputs.list(conn.id, tool) });
+  });
+  api.post('/connections/:id/inputs', small, (req, res) => {
+    if (mock) return res.status(403).json(MOCK_REFUSAL); // a shared mock copy keeps nothing one visitor could see from another
+    const conn = connection(req, res); if (!conn) return;
+    const body = isObject(req.body) ? req.body : {};
+    if (Object.keys(body).some((k) => !['tool', 'name', 'arguments', 'source'].includes(k))) return bad(res, 'accepted fields: tool, name, arguments, source');
+    try { res.status(201).json({ input: inputs.create(conn.id, body) }); } catch (err) { if (err instanceof InputError) return bad(res, err.message); throw err; }
+  });
+  api.delete('/connections/:id/inputs/:inputId', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    if (!inputs.remove(conn.id, req.params.inputId)) return bad(res, 'no such saved input', 404);
+    res.status(204).end();
+  });
 
   // ---- see: list ---------------------------------------------------------
   api.get('/connections/:id/tools', wrap(async (req, res) => {

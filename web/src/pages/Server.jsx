@@ -4,6 +4,7 @@ import { Untrusted, spansFor } from "../lib/Untrusted.jsx";
 import CallPanel from "../components/CallPanel.jsx";
 import ConfirmCall from "../components/ConfirmCall.jsx";
 import ScanResult, { SeverityBadge, downloadReport, worst } from "../components/ScanResult.jsx";
+import { estimateTokens, TOKEN_NOTE } from "../lib/tokens.js";
 
 // One connected server: Tools / Resources / Prompts, the Scan button, the scan result, then the call panel. The scan
 // result lives in App (scans[id]) so it survives moving between pages in this session.
@@ -144,13 +145,14 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
           <>
             {!tools && !err && <p className="muted">Listing...</p>}
             {tools && tools.length === 0 && <p className="muted">The server lists no tools.</p>}
+            {tools && tools.length > 0 && <p className="small muted" data-testid="list-tokens">This list costs an agent ~{estimateTokens({ tools })} tokens of context before it calls anything ({TOKEN_NOTE}).</p>}
             {tools && (
               <ul className="tool-list">
                 {tools.map((t, i) => {
                   const w = flaggedBy(t.name);
                   return (
                     <li key={`${t.name}-${i}`} className="tool">
-                      <strong><Untrusted text={t.name} spans={spansFor(findings, t.name, "name")} /></strong> {w && <SeverityBadge severity={w} />}
+                      <strong><Untrusted text={t.name} spans={spansFor(findings, t.name, "name")} /></strong> {w && <SeverityBadge severity={w} />} <span className="tok" data-testid="tool-tokens">~{estimateTokens(t)} tokens</span>
                       <div className="small"><Untrusted text={t.description || ""} spans={spansFor(findings, t.name, "description")} /></div>
                       <details>
                         <summary className="small">Input schema (shown as text)</summary>
@@ -187,13 +189,15 @@ function Others({ items, kind, idKey, findings }) {
   if (!items) return <p className="muted">Listing...</p>;
   if (items.length === 0) return <p className="muted">The server lists no {kind}s.</p>;
   return (
+    <>
+    <p className="small muted">These {kind}s cost ~{estimateTokens(items)} tokens to list ({TOKEN_NOTE}).</p>
     <ul className="tool-list">
       {items.map((it, i) => {
         const subject = `${kind}:${it[idKey] ?? it.name}`;
         const w = worst(findings.filter((f) => f.subject === subject));
         return (
           <li key={i} className="tool">
-            <strong><Untrusted text={it.name || it.uri} /></strong> {w && <SeverityBadge severity={w} />}
+            <strong><Untrusted text={it.name || it.uri} /></strong> {w && <SeverityBadge severity={w} />} <span className="tok">~{estimateTokens(it)} tokens</span>
             {it.uri && it.name && <div className="small muted"><Untrusted text={it.uri} /></div>}
             <div className="small"><Untrusted text={it.description || ""} /></div>
             {Array.isArray(it.arguments) && it.arguments.length > 0 && <div className="small muted">Arguments: <Untrusted text={it.arguments.map((a) => a?.name).join(", ")} /></div>}
@@ -201,6 +205,7 @@ function Others({ items, kind, idKey, findings }) {
         );
       })}
     </ul>
+    </>
   );
 }
 
