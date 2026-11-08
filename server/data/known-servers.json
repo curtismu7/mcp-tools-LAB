@@ -1,0 +1,23 @@
+{
+  "schema": "known-servers/1",
+  "servers": [
+    {
+      "id": "everything",
+      "label": "Everything reference server (official MCP test server)",
+      "transport": "http",
+      "url": "http://127.0.0.1:4730/mcp",
+      "authHeader": "Authorization",
+      "note": "Exposes every MCP primitive: tools, resources, resource templates and prompts. A clean server to compare the hostile one against.",
+      "start": "docker run -d --name everything-mcp -p 127.0.0.1:4730:3001 --read-only --tmpfs /tmp:rw,exec,nosuid,size=256m --cap-drop ALL --security-opt no-new-privileges -e HOME=/tmp -e npm_config_cache=/tmp/npm node:26-alpine sh -c 'npx -y @modelcontextprotocol/server-everything@2.2.1 streamableHttp'"
+    },
+    {
+      "id": "hostile-mcp",
+      "label": "Hostile MCP (live, from hostile-mcp-LAB)",
+      "transport": "http",
+      "url": "http://127.0.0.1:4701/mcp",
+      "authHeader": "Authorization",
+      "note": "Poisoned on purpose. The scanner should flag it.",
+      "start": "cd hostile-mcp-LAB && npm start    (or: HOST_PORT=4701 docker compose up -d)"
+    }
+  ]
+}

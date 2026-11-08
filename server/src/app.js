@@ -13,6 +13,7 @@ import express from 'express';
 import { argsHash, canonicalJson } from './canonical.js';
 import { dataDir, pingoneEnabled, port as configPort, scanMaxBytes } from './config.js';
 import { createGatewayRouter } from './gateway/routes.js';
+import { listKnownServers } from './knownServers.js';
 import { createHealth } from './health.js';
 import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
@@ -31,7 +32,7 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const bad = (res, message, status = 400, error = status === 404 ? 'not_found' : 'bad_request') => res.status(status).json({ error, message });
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
-export function createApp({ env = process.env, store = mockOnly(env) ? createMockStore() : createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null } = {}) {
+export function createApp({ env = process.env, store = mockOnly(env) ? createMockStore() : createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null, knownServers = listKnownServers } = {}) {
   const mock = mockOnly(env);
   if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
   const manager = createManager({ store, pingone: mock ? null : pingone, mock });
@@ -69,6 +70,12 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     return conn;
   };
 
+  // The MCP servers this family runs here, and whether each is running right now (a TCP connect to a loopback port). The hosted
+  // mock has none: it accepts only its built-in samples.
+  api.get('/known-servers', async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ servers: mock ? [] : await knownServers() });
+  });
   api.get('/config', (_req, res) => res.json({
     scanMaxBytes: maxScan, stdio: !mock, mockOnly: mock,
     pingone: pingone && !mock ? pingone.status() : { enabled: false },

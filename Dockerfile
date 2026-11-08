@@ -15,6 +15,7 @@ COPY server/package.json server/
 COPY web/package.json web/
 RUN npm ci --omit=dev --ignore-scripts -w server && mkdir /data && chown node:node /data && chmod 700 /data
 COPY server/src server/src
+COPY server/data server/data
 COPY --from=build /app/web/dist web/dist
 USER node
 EXPOSE 4810

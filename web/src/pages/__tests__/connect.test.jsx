@@ -72,3 +72,42 @@ describe("Connect page", () => {
     expect(screen.getByText(/launches the command below on this machine, with no shell/)).toBeInTheDocument();
   });
 });
+
+describe("Connect page: our servers", () => {
+  const SERVERS = [
+    { id: "everything", label: "Everything reference server", transport: "http", url: "http://127.0.0.1:4730/mcp", authHeader: "Authorization", note: "Every primitive.", start: "docker run everything-mcp", running: true },
+    { id: "hostile-mcp", label: "Hostile MCP", transport: "http", url: "http://127.0.0.1:4701/mcp", authHeader: "Authorization", note: "Poisoned on purpose.", start: "cd hostile-mcp-LAB && npm start", running: false },
+  ];
+
+  it("choosing a running server fills every field and says nothing else needs typing", async () => {
+    mockServer({ "GET /api/known-servers": () => ({ servers: SERVERS }) });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.selectOptions(await screen.findByLabelText("Our servers"), "everything");
+    expect(screen.getByLabelText("Name")).toHaveValue("Everything reference server");
+    expect(screen.getByLabelText("Server URL")).toHaveValue("http://127.0.0.1:4730/mcp");
+    expect(screen.getByLabelText("Auth header name")).toHaveValue("Authorization");
+    expect(screen.getByLabelText("Auth header value (optional)")).toHaveValue("");
+    expect(await screen.findByText(/Every field is filled in: press Connect and test/)).toBeInTheDocument();
+  });
+
+  it("choosing a server that is not running still fills the fields and shows how to start it, with a re-check", async () => {
+    mockServer({ "GET /api/known-servers": () => ({ servers: SERVERS }) });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.selectOptions(await screen.findByLabelText("Our servers"), "hostile-mcp");
+    expect(screen.getByLabelText("Server URL")).toHaveValue("http://127.0.0.1:4701/mcp");
+    expect(await screen.findByText(/Not running yet/)).toBeInTheDocument();
+    expect(screen.getByText("cd hostile-mcp-LAB && npm start")).toBeInTheDocument();
+    const before = sent("GET /api/known-servers").length;
+    await user.click(screen.getByRole("button", { name: "Check again" }));
+    expect(sent("GET /api/known-servers").length).toBe(before + 1);
+  });
+
+  it("shows no dropdown when the server lists none (or the route is missing)", async () => {
+    mockServer({ "GET /api/known-servers": () => ({ servers: [] }) });
+    render(<App />);
+    await screen.findByLabelText("Server URL");
+    expect(screen.queryByLabelText("Our servers")).toBeNull();
+  });
+});
