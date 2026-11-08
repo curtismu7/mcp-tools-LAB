@@ -71,7 +71,7 @@ export function createManager({ store, pingone = null, mock = false, oauth = nul
         const have = plainScopes(String(oauth.status(id).scope || '').split(/\s+/)); // the AS chose this text: plain names only
         const missing = need.filter((x) => !have.includes(x));
         if (missing.length) {
-          throw Object.assign(new Error(`This call needs the scope${missing.length > 1 ? 's' : ''} ${missing.join(' ')}, which this sign-in does not have (it has: ${have.join(' ') || 'none listed'}). Only if you trust this server: a scope is requested at sign-in only when the server itself lists it (in its challenge or its metadata); with our PingOne it must also be in MCPTOOLS_P1_SCOPES, and the sign-in application must be granted it on the server's resource. Then restart this tool if you changed MCPTOOLS_P1_SCOPES, sign out and sign in again.`), { code: 'mcp_scope_needed', httpStatus: 403 });
+          throw Object.assign(new Error(`This call needs the scope${missing.length > 1 ? 's' : ''} ${missing.join(' ')}, which this sign-in does not have (it has: ${have.join(' ') || 'none listed'}). It is requested at sign-in only if the server lists it and, for our PingOne, MCPTOOLS_P1_SCOPES allows it and the app is granted it. Trust this server first; then sign in again.`), { code: 'mcp_scope_needed', httpStatus: 403 });
         }
       }
       throw err;
