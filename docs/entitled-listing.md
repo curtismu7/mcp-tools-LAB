@@ -1,6 +1,18 @@
 # Entitled listing and aggregate cap (Ping release claim, simulated)
 
-**Ping release claim (2026-11-02), UNVERIFIED on our tenant.** The SE gateway is v1.261030 and does not have this release. Nothing here was measured against a gateway. The Entitled listing page and the third diagram run simulate the claim in this process so a presenter can show its shape. There is no live path for it in this app until the release is on our tenant; the app is the live inspector (or the hosted mock when `MOCK_ONLY` is set), and the simulation behaves the same in both because it never opens a socket.
+**Ping release claim (2026-11-02), UNVERIFIED on our tenant.** The SE gateway is v1.261030 and does not have this release. Nothing here was measured against a gateway. The Entitled listing page and the third diagram run simulate the claim in this process so a presenter can show its shape. In Mock the simulation never opens a socket. In Real (header toggle, not on a `MOCK_ONLY` copy) the page measures your own gateway instead.
+
+## Real mode
+
+Settings, read from the process environment first, then `STANDALONE_ENV`, then `~/Development/.env`:
+
+| Name | What |
+| --- | --- |
+| `MCP_TOOLS_GW_URL` | The gateway origin (https, or http on loopback). Each app is reached at `<origin>/<app>/mcp`. |
+| `MCP_TOOLS_GW_APPS` | Comma-separated MCP aggregate app names to compare. |
+| `MCP_TOOLS_GW_KEY_<NAME>` | One agent access key per caller; `NAME` is the caller label. Write-only: never returned, logged or shown, and scrubbed from every gateway message. |
+
+What Real does (`server/src/gateway/real.js`): `tools/list` for the chosen caller against every configured app, one after another; and a call by name, sent only when the name is NOT in that caller's listing and the operator ticked the confirm box, with no arguments. A listed tool is never called from this page. Which of the six checks a refusal matches is our reading of the gateway's message (for example "is not exposed by this aggregate" reads as the ToolFilter; "refused by policy" as a policy check, without saying which policy).
 
 ## What is simulated
 

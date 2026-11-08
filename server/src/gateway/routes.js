@@ -6,6 +6,7 @@ import { analyze, buildReport } from '../scanner/index.js';
 import { BOUNDS, ConfigError, TOOL_NAME, credentialLike, nameOk, normalizeConfig } from './config.js';
 import { freshConfig } from './fixture.js';
 import { BANNER, PROVENANCE, TAG_TEXT } from './provenance.js';
+import { createReal } from './real.js';
 import { audit, callAggregate, callMember, callerOf, listAggregate, listMember, memberOf } from './sim.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -41,7 +42,7 @@ function parse(body, allowed) {
 }
 const listing = ({ cfg, view, caller, member }) => (view === 'direct' ? listMember(cfg, member, caller.id) : listAggregate(cfg, caller.id));
 
-export function createGatewayRouter() {
+export function createGatewayRouter({ getMode = () => 'mock', mockOnly = false, env = process.env, real = createReal({ env }) } = {}) {
   const router = express.Router();
   const json = express.json({ limit: '64kb' });
   const wrap = (fn) => (req, res) => {
@@ -87,6 +88,54 @@ export function createGatewayRouter() {
       `This scan covers only the ${seen.tools.length} tool(s) that ${p.caller.label} sees. Tools hidden from this caller were not scanned, so a clean result here is not a clean result for any other caller.`,
     ];
     res.json({ claim: CLAIM, view: p.view, caller: p.caller.id, report, listed: seen });
+  }));
+
+  // ---- Real: the same questions asked of a real gateway's MCP aggregate apps, with the operator's agent keys ----
+  const REAL_CLAIM = Object.freeze({ banner: BANNER, model: 'measured on the gateway named in MCP_TOOLS_GW_URL', live: true });
+  const READING = 'Which check a refusal matches is our reading of the gateway\'s message; the gateway does not name the check.';
+  const realView = () => {
+    if (mockOnly) return { mode: 'mock', available: false, problem: 'This hosted copy is mock only (MOCK_ONLY=1): Real is unavailable.' };
+    const cfg = real.load();
+    return { mode: getMode(), available: cfg.ok, ...(cfg.ok ? { apps: cfg.apps, callers: cfg.callers.map(({ id, label }) => ({ id, label })) } : { problem: cfg.problem }) };
+  };
+  // Every Real request: Real mode on, configured, and an app and caller from the settings. -> cfg, or sends the refusal.
+  function realGate(req, res, allowed) {
+    if (mockOnly) { res.status(409).json({ error: 'real_not_available', message: 'Real is not available on this hosted mock copy (MOCK_ONLY=1).' }); return null; }
+    if (getMode() !== 'real') { res.status(409).json({ error: 'mock_mode', message: 'Switch the header to Real to ask the real gateway.' }); return null; }
+    const cfg = real.load();
+    if (!cfg.ok) { res.status(409).json({ error: 'real_not_configured', message: cfg.problem }); return null; }
+    const b = req.body;
+    if (!isObj(b) || Object.keys(b).some((k) => !allowed.includes(k))) { bad(res, `accepted fields: ${allowed.join(', ')}`); return null; }
+    if (!real.isApp(cfg, b.app)) { bad(res, 'app is not one of MCP_TOOLS_GW_APPS'); return null; }
+    if (!real.isCaller(cfg, b.caller)) { bad(res, 'caller is not one of the configured keys'); return null; }
+    return cfg;
+  }
+  const realWrap = (fn) => (req, res) => fn(req, res).catch((err) => {
+    console.error('[mcp-tools] real gateway error:', err?.code || err?.name);
+    if (!res.headersSent) res.status(500).json({ error: 'server_error' });
+  });
+
+  router.get('/real', (_req, res) => res.set('Cache-Control', 'no-store').json({ claim: REAL_CLAIM, reading: READING, ...realView() }));
+
+  router.post('/real/list', json, realWrap(async (req, res) => {
+    const cfg = realGate(req, res, ['app', 'caller']);
+    if (!cfg) return;
+    const out = await real.list(cfg, req.body.app, req.body.caller);
+    res.json({ claim: REAL_CLAIM, reading: READING, app: req.body.app, caller: req.body.caller, ...out });
+  }));
+
+  // Only a name that is NOT in this caller's listing is sent: this route tests the refusal, it never runs a listed tool.
+  router.post('/real/call', json, realWrap(async (req, res) => {
+    const cfg = realGate(req, res, ['app', 'caller', 'tool', 'confirm']);
+    if (!cfg) return;
+    if (!real.isTool(req.body.tool)) return bad(res, 'tool is not a well-formed tool name');
+    if (req.body.confirm !== true) return bad(res, 'confirm must be true: this sends a real tools/call to the gateway');
+    const seen = await real.list(cfg, req.body.app, req.body.caller);
+    if (seen.ok && seen.tools.some((t) => t.name === req.body.tool)) {
+      return res.status(409).json({ error: 'listed_tool', message: 'That tool is in this caller\'s listing. This page only tests that a hidden name is refused; call a listed tool from the Server page, behind the confirm dialog.' });
+    }
+    const out = await real.callHidden(cfg, req.body.app, req.body.caller, req.body.tool);
+    res.json({ claim: REAL_CLAIM, reading: READING, app: req.body.app, caller: req.body.caller, tool: req.body.tool, listedFirst: seen.ok, ...out });
   }));
 
   return router;

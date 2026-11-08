@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import ScanResult from "../components/ScanResult.jsx";
+import { Glossary, Intro, RealTryThis, SixChecks, TryThis } from "../components/GatewayLearn.jsx";
+import Diagram from "./Diagram.jsx";
+import GatewayReal, { REAL_LAYERS } from "./GatewayReal.jsx";
 import { Untrusted } from "../lib/Untrusted.jsx";
 import { post } from "../lib/api.js";
 import {
@@ -8,9 +11,9 @@ import {
 } from "../lib/gateway.js";
 import "./Gateway.css";
 
-// Entitled listing and aggregate cap. A SIMULATION in this process of a Ping release claim (2026-11-02), UNVERIFIED on our
-// tenant: there is no live path until that release is on our tenant. Every result below comes from the server's
-// /api/gateway routes (the engine), not from text in this file.
+// Entitled listing and aggregate cap, a Ping release claim (2026-11-02), UNVERIFIED on our tenant. Mock: a simulation in
+// this process; every result comes from the server's /api/gateway routes (the engine), not from text in this file. Real
+// (header toggle): GatewayReal asks a real gateway's aggregate apps. The teaching sections are in GatewayLearn.jsx.
 
 function AliasField({ value, taken, onCommit, label }) {
   const [draft, setDraft] = useState(value);
@@ -28,7 +31,7 @@ function Check({ checked, onChange, label, disabled }) {
   return <label className="gw__check"><input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} /> {label}</label>;
 }
 
-export default function Gateway({ gw }) {
+export default function Gateway({ gw, modeSource = "mock", theme, onNavigate }) {
   const { state, patch, edit, reset, ready, error } = gw;
   const { config, caller, view, member } = state;
   const [listing, setListing] = useState(null);
@@ -36,11 +39,13 @@ export default function Gateway({ gw }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [toolName, setToolName] = useState("");
+  const [tryStep, setTryStep] = useState(null);
+  const [realLayer, setRealLayer] = useState(null);
   const seq = useRef(0);
 
   // Re-evaluate whenever the config, the caller, the view or the member changes.
   useEffect(() => {
-    if (!config) return undefined;
+    if (!config || modeSource === "real") return undefined;
     const my = ++seq.current;
     setBusy(true);
     const body = { config, caller, view, ...(view === "direct" ? { member } : {}) };
@@ -51,8 +56,29 @@ export default function Gateway({ gw }) {
       else { setListing(null); setRows(null); setErr(l.data?.message || a.data?.message || `The simulated gateway refused the request (${l.status}).`); }
     });
     return () => { seq.current += 1; };
-  }, [config, caller, view, member]);
+  }, [config, caller, view, member, modeSource]);
 
+  const real = modeSource === "real";
+  const learnBottom = (
+    <>
+      <Glossary />
+      <h3>See it drawn</h3>
+      <p className="muted small">Press Simulate to walk a call through the gateway, or drag the boxes. The same picture is on How it fits.</p>
+      <Diagram theme={theme} onNavigate={onNavigate} gw={real ? undefined : gw} embedded />
+    </>
+  );
+  if (real) {
+    return (
+      <>
+        <h2>Entitled listing: each caller sees only its own tools</h2>
+        <Intro real />
+        <SixChecks real active={REAL_LAYERS[realLayer] || []} note={realLayer ? (realLayer === "policy" ? "Highlighted: the last refusal matches a policy check. The gateway's message does not say whether it was the member's policy or the aggregate cap." : realLayer === "key" ? "The last refusal came before any check: the agent key was not accepted." : "Highlighted: the check the last refusal matches (our reading of the gateway's message).") : null} />
+        <GatewayReal onLayer={setRealLayer} />
+        <RealTryThis />
+        {learnBottom}
+      </>
+    );
+  }
   if (error) return <p className="alert" role="alert">{error}</p>;
   if (!ready) return <p className="muted">Loading the simulated gateway...</p>;
 
@@ -63,12 +89,22 @@ export default function Gateway({ gw }) {
   const direct = view === "direct";
   const memberObj = config.members.find((m) => m.id === member) ?? config.members[0];
 
-  async function call() {
+  async function call(at = { caller, view, member, tool: toolName.trim(), config }) {
     setBusy(true);
-    const r = await post("/api/gateway/call", { config, caller, view, ...(direct ? { member } : {}), tool: toolName.trim() });
+    const r = await post("/api/gateway/call", { config: at.config, caller: at.caller, view: at.view, ...(at.view === "direct" ? { member: at.member } : {}), tool: at.tool });
     setBusy(false);
-    patch({ call: { status: r.status, ok: r.ok, data: r.data, name: toolName.trim() } });
+    patch({ call: { status: r.status, ok: r.ok, data: r.data, name: at.tool } });
   }
+  // A guided step: set the controls, and make the call it names, against the current config.
+  async function runStep(s) {
+    const a = s.action;
+    setTryStep(s.id);
+    const next = a.unreachable ? setMember(config, a.unreachable, { reachable: false }) : config;
+    if (next !== config) edit(next);
+    patch({ caller: a.caller, view: a.view, ...(a.member ? { member: a.member } : {}), call: null, scan: null });
+    if (a.call) { setToolName(a.call); await call({ caller: a.caller, view: a.view, member: a.member, tool: a.call, config: next }); }
+  }
+  const stopped = state.call?.data?.demoTrace?.steps?.find((x) => x.decision === "refused")?.layer;
   async function scan() {
     setBusy(true);
     const r = await post("/api/gateway/scan", { config, caller, view, ...(direct ? { member } : {}) });
@@ -79,8 +115,11 @@ export default function Gateway({ gw }) {
   const c = state.call;
   return (
     <>
-      <h2>Entitled listing and aggregate cap</h2>
-      <p className="lede"><strong>{BANNER}.</strong> This page simulates it in this process: nothing leaves this computer and there is no live path until the release is on our tenant. Pick a caller and look at what the gateway lists, then call a tool by name that you were not shown.</p>
+      <h2>Entitled listing: each caller sees only its own tools</h2>
+      <p className="lede"><strong>{BANNER}.</strong> Mock simulates it in this process; nothing leaves this computer. Start with "Try this", or pick a caller and call a tool you were not shown.</p>
+      <Intro real={false} />
+      <SixChecks active={stopped ? [stopped] : []} note={stopped ? `Highlighted: the check that stopped ${state.call.name}.` : state.call?.ok ? `${state.call.name} passed all six checks.` : null} />
+      <TryThis onRun={runStep} current={tryStep} disabled={busy} />
 
       <div className="card controls" role="group" aria-label="Who is asking, and through what">
         <label>Caller
@@ -95,7 +134,7 @@ export default function Gateway({ gw }) {
             <select value={memberObj.id} onChange={(e) => patch({ member: e.target.value, call: null, scan: null })}>{config.members.map((m) => <option key={m.id} value={m.id}>{m.alias}</option>)}</select>
           </label>
         )}
-        <button type="button" className="btn" onClick={reset} disabled={busy}>Reset</button>
+        <button type="button" className="btn" onClick={() => { setTryStep(null); reset(); }} disabled={busy}>Reset</button>
       </div>
       {err && <p className="alert" role="alert">{err}</p>}
 
@@ -122,7 +161,7 @@ export default function Gateway({ gw }) {
           <label className="gw__field gw__grow">Tool name
             <input value={toolName} onChange={(e) => setToolName(e.target.value)} placeholder={direct ? "tool" : "alias__tool"} spellCheck={false} />
           </label>
-          <button type="button" className="btn primary" onClick={call} disabled={busy || !toolName.trim()}>Call</button>
+          <button type="button" className="btn primary" onClick={() => call()} disabled={busy || !toolName.trim()}>Call</button>
         </div>
         {c && (
           <div className="gw__result" data-testid="call-result" data-state={c.ok ? "allowed" : "refused"} role="status">
@@ -221,6 +260,8 @@ export default function Gateway({ gw }) {
           </div>
         </fieldset>
       </details>
+
+      {learnBottom}
 
       <h3>Where each name comes from</h3>
       <div className="card">

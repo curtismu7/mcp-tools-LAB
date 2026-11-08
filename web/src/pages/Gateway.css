@@ -21,3 +21,24 @@
 .gw__table tr[data-state="hidden"] td:nth-child(2) { color: var(--deny); font-weight: 700; }
 .gw__caption { text-align: left; font-size: 0.85rem; color: var(--muted); padding: 0.25rem 0; }
 
+/* Teaching sections (GatewayLearn.jsx) and Real mode (GatewayReal.jsx). Theme tokens only. */
+.gwl__intro p { margin: 0.4rem 0; }
+.gwl__mode { border-left: 4px solid var(--border); padding-left: 0.6rem; }
+.gwl__checks { list-style: none; margin: 0.5rem 0; padding: 0; display: grid; gap: 0.4rem; }
+.gwl__checks li { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.5rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.gwl__checks li p { margin: 0.15rem 0 0; }
+.gwl__checks li[data-active] { border-color: var(--deny); border-left-width: 6px; }
+.gwl__n { flex: 0 0 auto; width: 1.6rem; height: 1.6rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; border: 1px solid var(--border); }
+.gwl__checks li[data-active] .gwl__n { border-color: var(--deny); color: var(--deny); }
+.gwl__note { margin: 0.6rem 0 0; padding: 0.5rem 0.7rem; border-left: 4px solid var(--hold); background: var(--bg); overflow-wrap: anywhere; }
+.gwl__steps { margin: 0.4rem 0; padding-left: 1.4rem; display: grid; gap: 0.35rem; }
+.gwl__list { margin: 0.4rem 0; padding-left: 1.4rem; }
+.gwl__list li { margin: 0.25rem 0; }
+.gwl__terms { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: 0.35rem 1rem; margin: 0.4rem 0; }
+.gwl__terms dt { font-weight: 600; }
+.gwl__terms dd { margin: 0; }
+.gwl__box { max-height: 22rem; overflow-y: auto; }
+.gwl__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0.4rem 0; }
+@media (max-width: 600px) { .gwl__terms { grid-template-columns: 1fr; } .gwl__terms dd { margin-bottom: 0.4rem; } }
+.gw__table td .gw__check { white-space: nowrap; }
+.gw__table td input[type="radio"] { width: auto; min-width: 1.1rem; min-height: 1.1rem; }

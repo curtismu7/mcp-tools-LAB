@@ -41,7 +41,7 @@ describe("the release-claim banner", () => {
       expect(screen.getByRole("link", { name })).toHaveAttribute("aria-current", "page");
       const b = screen.getByTestId("release-banner");
       expect(b).toHaveTextContent(BANNER);
-      expect(b).toHaveTextContent(/no live path/);
+      expect(b).toHaveTextContent(/simulated in Mock; in Real/);
       await waitFor(() => expect(b).toHaveTextContent(/live inspector/));
     }
   });
