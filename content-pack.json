@@ -22,7 +22,7 @@
     {
       "id": "aggregate-policy-cap",
       "term": "Aggregate policy cap",
-      "definition": "A Ping release claim (2026-11-02), UNVERIFIED on our tenant, and simulated in this app: an aggregate of member MCP servers has one policy that caps what any member tool may be used for. It is enforced on the listing and again at the member hop. The cap only removes: a tool the member itself denies stays denied. The console API has no field for it, so this lab gives it no field name.",
+      "definition": "A Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant, and simulated in this app: an aggregate of member MCP servers has one policy that caps what any member tool may be used for. It is enforced on the listing and again at the member hop. The cap only removes: a tool the member itself denies stays denied. The console API has no field for it, so this lab gives it no field name.",
       "aliases": [
         "policy cap",
         "cap enforced twice"
@@ -49,7 +49,7 @@
     {
       "id": "entitlement-aware-discovery",
       "term": "Entitlement-aware discovery",
-      "definition": "A Ping release claim (2026-11-02), UNVERIFIED on our tenant, and simulated in this app: a tool the caller is not entitled to is removed from tools/list instead of only being refused when called, and it is refused again when called by name. The simulation is lab-invented; the console API has no field for it.",
+      "definition": "A Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant, and simulated in this app: a tool the caller is not entitled to is removed from tools/list instead of only being refused when called, and it is refused again when called by name. The simulation is lab-invented; the console API has no field for it.",
       "aliases": [
         "entitled listing",
         "filtered tools/list"
@@ -220,7 +220,7 @@
     {
       "id": "entitled-listing",
       "label": "Entitled listing and aggregate cap (Ping release claim)",
-      "description": "A simulation of a Ping release claim (2026-11-02), UNVERIFIED on our tenant: tools a caller may not use are removed from the list and refused by name, and an aggregate policy cap is enforced twice. Edit the policy and watch the lists change.",
+      "description": "A simulation of a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant: tools a caller may not use are removed from the list and refused by name, and an aggregate policy cap is enforced twice. Edit the policy and watch the lists change.",
       "group": "try-it",
       "terms": [
         "entitlement-aware-discovery",

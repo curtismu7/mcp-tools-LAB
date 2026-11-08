@@ -1,7 +1,7 @@
 // Credential refusal, one shape and one place at a time. This lab takes no credential: text that looks like one is refused
 // wherever the sender can type it (labels, descriptions, names, aliases, ids, call arguments and everything inside a tool
 // inputSchema), and it is never echoed in a response or a log line. A negative control sits beside every refusal, so a
-// refusal can only come from the value, not from the shape of the request. Ping release claim of 2026-11-02, UNVERIFIED on our tenant.
+// refusal can only come from the value, not from the shape of the request. Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant).
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BOUNDS, credentialLike, credentialRules, nameOk, RULE_NAMES, TOOL_NAME } from '../src/gateway/config.js';

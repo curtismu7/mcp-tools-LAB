@@ -33,5 +33,5 @@ The scanner **reports; it never blocks**, never calls a tool and never changes a
 - Poisoned resources and prompts are only seen if their content was fetched. A metadata-only or offline snapshot scan reads only the names and descriptions it was given.
 - The rules are heuristics over known poisoning shapes. A novel phrasing, another language, or an instruction split across fields can slip past, and an unusually worded legitimate tool can trip a flag.
 - A clean scan is not proof of safety. It does not judge what a tool does when called, who runs the server, or whether the tool should be allowed at all. Control of the call path is a separate layer.
-- A scan of an entitlement-filtered list covers only what that caller sees. A tool hidden from this caller was never scanned, so a clean result is not a clean result for any other caller. (Ping release claim of 2026-11-02, UNVERIFIED on our tenant; the lab only simulates it.)
+- A scan of an entitlement-filtered list covers only what that caller sees. A tool hidden from this caller was never scanned, so a clean result is not a clean result for any other caller. (Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant); the lab only simulates it.)
 - The scanner reports. It never blocks a server, changes its data, or stops an agent.

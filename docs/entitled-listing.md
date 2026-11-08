@@ -1,6 +1,6 @@
 # Entitled listing and aggregate cap (Ping release claim, simulated)
 
-**Ping release claim (2026-11-02), UNVERIFIED on our tenant.** The SE gateway is v1.261030 and does not have this release. Nothing here was measured against a gateway. The Entitled listing page and the third diagram run simulate the claim in this process so a presenter can show its shape. In Mock the simulation never opens a socket. In Real (header toggle, not on a `MOCK_ONLY` copy) the page measures your own gateway instead.
+**Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant.** Our SE gateway runs `v1.261106`, which is after the 2026-11-02 release (read from the cluster on 2026-11-08: `kubectl --context us -n ping-devops-curtismuir get deploy agentless-mcpgw -o jsonpath='{.spec.template.spec.containers[0].image}'`). The gateway does not report its image version over MCP, so set `MCP_TOOLS_GW_VERSION` to label what you are measuring. On that gateway one agent key listed 44 tools on the full aggregate, 4 on the capped one, and was refused on the third; per-caller entitlement (two keys, different lists) has not been tested. The Entitled listing page and the third diagram run simulate the claim in this process so a presenter can show its shape. In Mock the simulation never opens a socket. In Real (header toggle, not on a `MOCK_ONLY` copy) the page measures your own gateway instead.
 
 ## Real mode
 
@@ -10,6 +10,7 @@ Settings, read from the process environment first, then `STANDALONE_ENV`, then `
 | --- | --- |
 | `MCP_TOOLS_GW_URL` | The gateway origin (https, or http on loopback). Each app is reached at `<origin>/<app>/mcp`. |
 | `MCP_TOOLS_GW_APPS` | Comma-separated MCP aggregate app names to compare. |
+| `MCP_TOOLS_GW_VERSION` | Optional label for the gateway image you are measuring, such as `v1.261106`. The gateway does not report it over MCP, so this is what you say it is; the Real tab shows it. |
 | `MCP_TOOLS_GW_KEY_<NAME>` | One agent access key per caller; `NAME` is the caller label. Write-only: never returned, logged or shown, and scrubbed from every gateway message. |
 
 What Real does (`server/src/gateway/real.js`): `tools/list` for the chosen caller against every configured app, one after another; and a call by name, sent only when the name is NOT in that caller's listing and the operator ticked the confirm box, with no arguments. A listed tool is never called from this page. Which of the six checks a refusal matches is our reading of the gateway's message (for example "is not exposed by this aggregate" reads as the ToolFilter; "refused by policy" as a policy check, without saying which policy).

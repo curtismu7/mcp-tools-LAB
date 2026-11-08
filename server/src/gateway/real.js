@@ -52,7 +52,9 @@ export function realConfig(s) {
     .filter((c) => NAME.test(c.id) && c.key && !/[\s\u0000-\u001f]/.test(c.key))
     .map((c) => ({ ...c, id: c.id.toLowerCase(), label: c.id.charAt(0) + c.id.slice(1).toLowerCase().replace(/_/g, ' ') }));
   if (!callers.length) return { ok: false, problem: `Real is not configured: no agent key. ${NOT_SET}` };
-  return { ok: true, origin: url.origin, apps, callers };
+  // A label only: the gateway does not report its image version over MCP, so the operator says what they are measuring.
+  const version = /^[A-Za-z0-9._+-]{1,40}$/.test(s.MCP_TOOLS_GW_VERSION || '') ? s.MCP_TOOLS_GW_VERSION : null;
+  return { ok: true, origin: url.origin, apps, callers, version };
 }
 
 // Which of the six checks a gateway refusal looks like. Our reading of the gateway's words, not a field it sends.

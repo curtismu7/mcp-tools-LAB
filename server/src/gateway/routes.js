@@ -96,7 +96,7 @@ export function createGatewayRouter({ getMode = () => 'mock', mockOnly = false, 
   const realView = () => {
     if (mockOnly) return { mode: 'mock', available: false, problem: 'This hosted copy is mock only (MOCK_ONLY=1): Real is unavailable.' };
     const cfg = real.load();
-    return { mode: getMode(), available: cfg.ok, ...(cfg.ok ? { apps: cfg.apps, callers: cfg.callers.map(({ id, label }) => ({ id, label })) } : { problem: cfg.problem }) };
+    return { mode: getMode(), available: cfg.ok, ...(cfg.ok ? { version: cfg.version, apps: cfg.apps, callers: cfg.callers.map(({ id, label }) => ({ id, label })) } : { problem: cfg.problem }) };
   };
   // Every Real request: Real mode on, configured, and an app and caller from the settings. -> cfg, or sends the refusal.
   function realGate(req, res, allowed) {
