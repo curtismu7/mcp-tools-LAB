@@ -1,7 +1,7 @@
 // The config validator, one rule at a time. Every refusal test changes ONE thing in an otherwise valid config (so a refusal
 // cannot be a side effect such as a dangling name), names the path in the message, and sits beside a control that is
 // accepted. Bounds are written as literal numbers here, not read from BOUNDS, so a changed bound is noticed.
-// Ping release claim of 2026-11-02, UNVERIFIED on our tenant.
+// Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant).
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ConfigError, normalizeConfig } from '../src/gateway/config.js';

@@ -105,6 +105,23 @@ describe("Entitled listing: Real", () => {
     expect(sent("POST /api/gateway/list")).toHaveLength(0); // the simulation is not asked in Real
   });
 
+  it("names the gateway version the operator set, or asks for it", async () => {
+    const info = { available: true, mode: "real", apps: ["full"], callers: [{ id: "analyst", label: "Analyst" }], reading: "r" };
+    realServer({ "GET /api/gateway/real": () => ({ ...info, version: "v1.261106" }) });
+    const user = userEvent.setup();
+    await openPage(user);
+    expect(await screen.findByTestId("real-version")).toHaveTextContent("version v1.261106");
+    expect(screen.getByTestId("real-note")).toHaveTextContent(/as you set it: the gateway does not report its own/);
+  });
+
+  it("asks for the version when none is set", async () => {
+    realServer({ "GET /api/gateway/real": () => ({ available: true, mode: "real", apps: ["full"], callers: [{ id: "analyst", label: "Analyst" }], reading: "r", version: null }) });
+    const user = userEvent.setup();
+    await openPage(user);
+    expect(await screen.findByTestId("real-note")).toHaveTextContent(/version not set/);
+    expect(screen.queryByTestId("real-version")).toBeNull();
+  });
+
   it("says why when Real is not set up", async () => {
     realServer({ "GET /api/gateway/real": () => ({ available: false, mode: "real", problem: "Real is not configured: no gateway URL." }) });
     const user = userEvent.setup();

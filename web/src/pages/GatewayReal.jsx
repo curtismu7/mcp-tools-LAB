@@ -71,7 +71,7 @@ export default function GatewayReal({ onLayer }) {
 
   return (
     <>
-      <p className="notice" role="note" data-testid="real-note"><strong>Real:</strong> measured on your gateway with the agent key for {callerLabel}. {info.reading}</p>
+      <p className="notice" role="note" data-testid="real-note"><strong>Real:</strong> measured on your gateway{info.version ? <> (<span data-testid="real-version">version {info.version}</span>, as you set it: the gateway does not report its own)</> : <> (version not set: put <code>MCP_TOOLS_GW_VERSION</code> in your settings so this page says what you measured)</>} with the agent key for {callerLabel}. {info.reading}</p>
       <div className="card controls" role="group" aria-label="Who is asking">
         <label>Caller (agent key)
           <select value={caller} onChange={(e) => setCaller(e.target.value)} disabled={busy}>{info.callers.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>

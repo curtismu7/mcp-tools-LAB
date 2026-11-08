@@ -10,7 +10,7 @@ export const TAG_TEXT = Object.freeze({
   invented: 'lab-invented',
 });
 
-export const BANNER = 'Ping release claim (2026-11-02), UNVERIFIED on our tenant';
+export const BANNER = 'Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant';
 
 export const PROVENANCE = Object.freeze([
   { name: 'mcp-aggregate', tag: 'swagger', note: 'AppType value on the console API' },

@@ -1,8 +1,8 @@
 // A simulated MCP gateway: entitlement-aware discovery and an aggregate of member MCP servers whose policy is a cap.
 //
 // WHAT THIS IS. A lab-invented model of what Ping's deck says the 2026-11-02 release does (slides 36 and 37). It is a
-// Ping release claim, UNVERIFIED on our tenant: the SE gateway is v1.261030 and does not have it. Nothing here calls a
-// gateway, a tenant or the network. It is pure functions over a normalized config (config.js).
+// Ping release claim. Real mode measured the listing and the cap on SE gateway v1.261106 (2026-11-08); per-caller
+// entitlement is still UNVERIFIED on our tenant (one agent key). Nothing in THIS file calls a gateway, a tenant or the network. It is pure functions over a normalized config (config.js).
 //
 // THE MODEL (each rule is a claim; see provenance.js for how each name is tagged):
 //  1. Discovery is entitlement-aware: a tool the caller is not entitled to is REMOVED from tools/list, not just refused.

@@ -100,7 +100,7 @@ export const WIRE = {
   },
 };
 
-// The entitled-listing view (Ping release claim of 2026-11-02, UNVERIFIED on our tenant). Examples only; the Entitled
+// The entitled-listing view (Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant)). Examples only; the Entitled
 // listing page shows what the simulated engine actually returns.
 const GW_HOST = "gateway.example.com";
 WIRE.gcaller = {
