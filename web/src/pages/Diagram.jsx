@@ -170,10 +170,11 @@ function useNarrow() {
   return narrow;
 }
 
-export default function Diagram({ theme = "system", onNavigate, gw }) {
+// embedded: shown inside the Entitled listing page, fixed on the gateway run, without its own heading or run picker.
+export default function Diagram({ theme = "system", onNavigate, gw, embedded = false }) {
   const narrow = useNarrow();
   const [selected, setSelected] = useState(null);
-  const [scenario, setScenario] = useState("scan");
+  const [scenario, setScenario] = useState(embedded ? "gateway" : "scan");
   const [speed, setSpeed] = useState("1");
   const [step, setStep] = useState(-1);
   const [running, setRunning] = useState(false);
@@ -211,7 +212,7 @@ export default function Diagram({ theme = "system", onNavigate, gw }) {
   }, [showLive, gwState?.config, gwState?.caller]);
 
   const simulate = () => { setStep(0); setRunning(true); };
-  const reset = () => { setRunning(false); setStep(-1); setDragged({ key: startKey, nodes: start }); setSelected(null); setFit((n) => n + 1); gw?.reset?.(); };
+  const reset = () => { setRunning(false); setStep(-1); setDragged({ key: startKey, nodes: start }); setSelected(null); setFit((n) => n + 1); if (!embedded) gw?.reset?.(); };
   const pick = (s) => { setScenario(s); setRunning(false); setStep(-1); };
   const onNodesChange = useCallback((c) => setDragged((d) => ({ key: startKey, nodes: applyNodeChanges(c, d.key === startKey ? d.nodes : start) })), [startKey, start]);
 
@@ -230,13 +231,13 @@ export default function Diagram({ theme = "system", onNavigate, gw }) {
 
   return (
     <>
-      <h2>How the pieces fit</h2>
-      <p className="lede">Connect and see, scan to judge before an agent ingests, you decide, the confirm dialog gates the call, and the Privilege demo controls calls on the wire. Drag any box. The third run is a Ping release claim (2026-11-02), UNVERIFIED on our tenant, simulated by this app.</p>
+      {!embedded && <h2>How the pieces fit</h2>}
+      {!embedded && <p className="lede">Connect and see, scan to judge before an agent ingests, you decide, the confirm dialog gates the call, and the Privilege demo controls calls on the wire. Drag any box. The third run is a Ping release claim (2026-11-02), UNVERIFIED on our tenant, simulated by this app.</p>}
       <div className="card controls">
-        <label>Run<select value={scenario} onChange={(e) => pick(e.target.value)}>{Object.entries(SCENARIOS).map(([id, s]) => <option key={id} value={id}>{s.label}</option>)}</select></label>
+        {!embedded && <label>Run<select value={scenario} onChange={(e) => pick(e.target.value)}>{Object.entries(SCENARIOS).map(([id, s]) => <option key={id} value={id}>{s.label}</option>)}</select></label>}
         <label>Speed<select value={speed} onChange={(e) => setSpeed(e.target.value)}>{SPEEDS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>
         <button type="button" className="btn primary" onClick={simulate} disabled={running}>Simulate</button>
-        <button type="button" className="btn" onClick={reset}>Reset</button>
+        <button type="button" className="btn" onClick={reset}>{embedded ? "Reset diagram" : "Reset"}</button>
       </div>
       <div className="flow-wrap" role="group" aria-label={view.label} data-layout={narrow ? "narrow" : "wide"} style={height ? { height } : undefined}>
         <ReactFlow key={`${SCENARIOS[scenario].view}-${narrow}-${fit}`} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChange} colorMode={theme}

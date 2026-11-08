@@ -40,7 +40,7 @@ On the hostile server, flag the poisoned tool with a note ("asks the agent to mo
 
 ## The entitlement simulation
 
-Open the Entitled listing tab and the diagram. A banner says it on every tab: this simulates what Ping's release is said to add — a tool the caller is not entitled to is removed from `tools/list` and refused again when called by name, and an aggregate of member servers (tools named `alias__tool`) has one policy capping every member. It is a simulation in this process; there is no live path, and it is UNVERIFIED on our tenant.
+Open the Entitled listing tab and the diagram. A banner says it on every tab: this simulates what Ping's release is said to add — a tool the caller is not entitled to is removed from `tools/list` and refused again when called by name, and an aggregate of member servers (tools named `alias__tool`) has one policy capping every member. In Mock it is a simulation in this process. Switch the header to Real and the page asks your own gateway's aggregate apps with your agent keys, so you can show a hidden tool being refused by name on a real gateway. Per-caller entitlement with several keys is still UNVERIFIED on our tenant.
 
 ## Two stories, presenter mode
 
