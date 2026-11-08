@@ -65,7 +65,8 @@ export function createHttpClient({ url, getAuth, timeoutMs = 15_000, clientInfo 
     if (res.status >= 300 && res.status < 400) { res.body?.cancel().catch(() => {}); throw rpcError(`MCP HTTP ${res.status}: redirects are not followed`, 'mcp_http_error', { httpStatus: res.status }); }
     if (!res.ok) {
       const body = (await res.text().catch(() => '')).slice(0, 300);
-      throw rpcError(`MCP HTTP ${res.status}${body ? `: ${body}` : ''}`, 'mcp_http_error', { httpStatus: res.status });
+      const challenge = res.status === 401 ? (res.headers.get('www-authenticate') || '').slice(0, 2000) : undefined; // the sign-in challenge, for oauth.noteChallenge
+      throw rpcError(`MCP HTTP ${res.status}${body ? `: ${body}` : ''}`, 'mcp_http_error', { httpStatus: res.status, ...(challenge ? { wwwAuthenticate: challenge } : {}) });
     }
     const sid = res.headers.get('mcp-session-id');
     if (sid) state.sessionId = sid;

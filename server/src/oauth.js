@@ -113,6 +113,8 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
   const sessions = new Map(); // connection id -> { issuer, clientId, clientSecret, accessToken, refreshToken, expiresAt, scope, tokenEndpoint, resource }
   const pending = new Map(); // state -> { connectionId, verifier, redirectUri, issuer, clientId, clientSecret, tokenEndpoint, resource, scope, at }
   const discovered = new Map(); // connection id -> { at, info }
+  const challenges = new Map(); // connection id -> { at, header }: a Bearer challenge a real call got (see noteChallenge)
+  const CHALLENGE_TTL_MS = 60 * 60 * 1000;
 
   async function discover(conn, { fresh = false } = {}) {
     const hit = discovered.get(conn.id);
@@ -123,8 +125,10 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'mcp-tools', version: '0.1.0' } } }),
     });
-    if (probe.status !== 401) { const info = { required: false }; discovered.set(conn.id, { at: Date.now(), info }); return info; }
-    const challenge = parseChallenge(probe.headers.get('www-authenticate'));
+    const noted = challenges.get(conn.id);
+    const wantsToken = probe.status === 401 || (noted && now() - noted.at < CHALLENGE_TTL_MS);
+    if (!wantsToken) { const info = { required: false }; discovered.set(conn.id, { at: Date.now(), info }); return info; }
+    const challenge = parseChallenge(probe.status === 401 ? probe.headers.get('www-authenticate') : noted.header);
     // 2. Protected-resource metadata (RFC 9728): the URL from the challenge, else the well-known path.
     const candidates = challenge.resource_metadata ? [challenge.resource_metadata]
       : [`${server.origin}/.well-known/oauth-protected-resource${server.pathname.replace(/\/$/, '')}`, `${server.origin}/.well-known/oauth-protected-resource`];
@@ -267,7 +271,17 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
     // Who is signed in (claims only), for filling the call form; null when not signed in or the token is not a JWT.
     identity: (connectionId) => { const s = sessions.get(connectionId); return s && s.expiresAt > Date.now() ? identityFrom(s.accessToken) : null; },
     secrets: (connectionId) => { const s = sessions.get(connectionId); return s ? [s.accessToken, s.refreshToken, s.clientSecret].filter(Boolean) : []; },
-    signOut(connectionId) { sessions.delete(connectionId); discovered.delete(connectionId); for (const [k, p] of pending) if (p.connectionId === connectionId) pending.delete(k); },
-    clear() { sessions.clear(); pending.clear(); discovered.clear(); piflow.clear(); },
+    // A real call got a 401 with a Bearer challenge: the server wants a token even though its initialize probe said no. Only a
+    // Bearer challenge counts (Basic or none is an ordinary error). Returns whether it was recorded.
+    noteChallenge(connectionId, header) {
+      if (typeof header !== 'string' || !/^\s*Bearer\b/i.test(header)) return false;
+      challenges.set(connectionId, { at: now(), header: header.slice(0, 2000) });
+      discovered.delete(connectionId);
+      return true;
+    },
+    clearChallenge(connectionId) { challenges.delete(connectionId); discovered.delete(connectionId); },
+    // Sign out keeps the challenge (the server still wants a token); forget (a deleted connection) drops it.
+    signOut(connectionId, { forget = false } = {}) { sessions.delete(connectionId); discovered.delete(connectionId); if (forget) challenges.delete(connectionId); for (const [k, p] of pending) if (p.connectionId === connectionId) pending.delete(k); },
+    clear() { sessions.clear(); pending.clear(); discovered.clear(); challenges.clear(); piflow.clear(); },
   };
 }

@@ -13,7 +13,7 @@ import { SEV } from "./ScanResult.jsx";
 // `fixedTool`: the panel is for that one tool (a Run button on its card); the tool picker is hidden.
 // `covered`: the last scan still covers the tool list shown (false after a rug-pull until the next scan): filling in and Pick
 // are held back until it does.
-export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick, fixedTool, covered = true }) {
+export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick, fixedTool, covered = true, onSignInNeeded }) {
   const [name, setName] = useState(fixedTool || "");
   const [values, setValues] = useState({});
   const [raw, setRaw] = useState("{}");
@@ -118,6 +118,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
     setBusy(true);
     const r = await post(`${base}/call`, { tool: lt, arguments: {}, confirm: true, argsHash: rv.argsHash });
     setBusy(false); setLookup(null);
+    if (r.data?.error === "mcp_signin_needed") onSignInNeeded?.();
     if (!r.ok) { setError(r.data?.message || `The lookup failed (${r.status}).`); return; }
     setChoices((c) => ({ ...c, [lt]: choicesFrom(r.data.result) }));
     setChoosing(field);
@@ -156,6 +157,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
     const r = await post(`${base}/call`, { tool: name, arguments: review.args, confirm: true, argsHash: review.argsHash });
     setBusy(false);
     setReview(null);
+    if (r.data?.error === "mcp_signin_needed") onSignInNeeded?.(); // the server wants a token for calls: show the sign-in panel
     setResult(r.ok ? { ok: true, value: r.data.result, flagged } : { ok: false, text: r.data?.message || `The call failed (${r.status}).` });
   }
 

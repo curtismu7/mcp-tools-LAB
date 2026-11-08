@@ -70,7 +70,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   // Text from a failing server or transport, with this connection's secrets removed.
   const fail = (res, err, conn, status = 502) => {
     const secrets = secretsFor(conn);
-    res.status(err.code === 'pingone_login_required' ? 401 : status).json({ error: err.code || 'upstream_error', message: clip(scrub(err.message, secrets)) });
+    res.status(err.code === 'pingone_login_required' || err.code === 'mcp_signin_needed' ? 401 : status).json({ error: err.code || 'upstream_error', message: clip(scrub(err.message, secrets)) });
   };
   // A success body that came from a server: this connection's secrets are removed if the server echoed them back.
   const secretsFor = (conn) => [...store.secretsOf(conn), ...(pingone?.secrets() || []), ...(conn?.id ? oauth.secrets(conn.id) : [])];
@@ -147,7 +147,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   api.delete('/connections/:id', wrap(async (req, res) => {
     if (!(await manager.remove(req.params.id))) return bad(res, 'no such connection', 404);
     inputs.removeFor(req.params.id);
-    oauth.signOut(req.params.id);
+    oauth.signOut(req.params.id, { forget: true });
     flags.removeFor(req.params.id);
     liveProxy.closeRoute(req.params.id);
     res.status(204).end();

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 
 // A fake authorization server and a protected MCP server on loopback, shared by the OAuth tests. `opts` bends them:
-// resource (the resource the fake MCP server names), wrongIssuer, noRegistration, asOverride, iss/noIss/issParameter, authEndpoint, lax (codes reusable), expiresIn, echo (the MCP server
+// lazy (only tools/call needs a token), challenge (the WWW-Authenticate value), resource (the resource the fake MCP server names), wrongIssuer, noRegistration, asOverride, iss/noIss/issParameter, authEndpoint, lax (codes reusable), expiresIn, echo (the MCP server
 // echoes the Bearer it got in tools/call).
 export const servers = [];
 export const listen = (handler) => new Promise((r) => { const s = http.createServer(handler); servers.push(s); s.listen(0, '127.0.0.1', () => r(`http://127.0.0.1:${s.address().port}`)); });
@@ -45,8 +45,9 @@ export async function world(opts = {}) {
     const body = await readBody(req);
     const auth = req.headers.authorization || '';
     st.mcpAuth.push(auth);
-    if (!st.tokens.has(auth.replace(/^Bearer /, ''))) return res.writeHead(401, { 'www-authenticate': `Bearer resource_metadata="${mcpUrl}/.well-known/oauth-protected-resource", scope="tools:read"` }).end();
     const msg = JSON.parse(body || '{}');
+    const open = (opts.lazy && msg.method !== 'tools/call') || st.open; // st.open: a test opens the whole server // lazy: only tools/call needs a token (like the Banking MCP server)
+    if (!open && !st.tokens.has(auth.replace(/^Bearer /, ''))) return res.writeHead(401, { 'www-authenticate': opts.challenge || `Bearer resource_metadata="${mcpUrl}/.well-known/oauth-protected-resource", scope="tools:read"` }).end();
     if (msg.id === undefined) return res.writeHead(202).end();
     const result = msg.method === 'initialize' ? { protocolVersion: '2025-06-18', serverInfo: { name: 'protected', version: '1' }, capabilities: { tools: {} } } : msg.method === 'tools/list' ? { tools: [{ name: 'whoami', description: 'w', inputSchema: { type: 'object' } }] } : { content: [{ type: 'text', text: `echo ${auth}` }] };
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));

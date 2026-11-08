@@ -10,13 +10,14 @@ import SignInModal from "./SignInModal.jsx";
 const POLL_MS = 2000;
 const WAIT_MS = 5 * 60 * 1000;
 
-export default function OAuthPanel({ conn, onSignedIn }) {
+export default function OAuthPanel({ conn, onSignedIn, recheck = 0 }) {
   const [s, setS] = useState(null);
   const [err, setErr] = useState("");
   const [clientId, setClientId] = useState("");
   const [waiting, setWaiting] = useState(false);
   const [modal, setModal] = useState(false);
   const timer = useRef(null);
+  const cardRef = useRef(null);
   const base = `/api/connections/${encodeURIComponent(conn.id)}/oauth`;
 
   const load = useCallback(async () => {
@@ -27,7 +28,7 @@ export default function OAuthPanel({ conn, onSignedIn }) {
     setS(null); setErr(code.startsWith("oauth_") && code !== "oauth_unreachable" ? r.data?.message || "" : "");
     return null;
   }, [base]);
-  useEffect(() => { load(); return () => clearInterval(timer.current); }, [load]);
+  useEffect(() => { load(); return () => clearInterval(timer.current); }, [load, recheck]); // recheck: a call was refused with a 401, so ask again whether the server wants a token
 
   async function signIn() {
     setErr("");
@@ -45,10 +46,13 @@ export default function OAuthPanel({ conn, onSignedIn }) {
   }
   async function signOut() { await post(`${base}/signout`); clearInterval(timer.current); setWaiting(false); load(); }
 
+  // After a refused call (recheck > 0) the card may be off screen: bring it into view once it shows up.
+  const showing = Boolean((s && s.required) || err);
+  useEffect(() => { if (recheck > 0 && showing) cardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }); }, [recheck, showing]);
   if (!s && !err) return null;
   if (s && !s.required) return null;
   return (
-    <div className="card" data-testid="oauth">
+    <div className="card" data-testid="oauth" ref={cardRef}>
       <h3>OAuth sign-in</h3>
       {err && <p className="alert" role="alert"><Untrusted text={err} /></p>}
       {s?.refused && <p className="notice" role="note"><Untrusted text={s.refused} /></p>}
