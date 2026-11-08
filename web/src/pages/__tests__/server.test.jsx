@@ -222,3 +222,16 @@ describe("Server page: call", () => {
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   });
 });
+
+describe("Server page: locked calls", () => {
+  it("offers Scan now right where calls are locked", async () => {
+    mockServer({ "POST /api/connections/c1/scan": () => ({ report: REPORT, listed: { tools: TOOLS, resources: [], prompts: [] } }) });
+    const user = userEvent.setup();
+    await openServer(user);
+    const locked = await screen.findByTestId("call-locked");
+    await user.click(within(locked).getByRole("button", { name: "Scan now" }));
+    expect(sent("POST /api/connections/c1/scan")).toHaveLength(1);
+    await screen.findByTestId("scan-result");
+    expect(screen.queryByTestId("call-locked")).toBeNull();
+  });
+});

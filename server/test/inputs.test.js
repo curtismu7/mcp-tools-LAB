@@ -86,3 +86,23 @@ test('a MOCK_ONLY copy refuses to save inputs (nothing shared between visitors)'
     assert.deepEqual((await app.call('GET', '/api/connections/mock-sample/inputs')).json.inputs, []);
   } finally { await app.close(); }
 });
+
+test('delete is scoped to its own connection and same-origin; odd ids and queries are refused', T, async () => {
+  const other = await startFakeMcp({});
+  await withConn(async ({ call }, id) => {
+    const b = (await call('POST', '/api/connections', { transport: 'http', url: other.url, label: 'b' })).json.connection.id;
+    const inp = (await call('POST', `/api/connections/${id}/inputs`, { tool: 't', name: 'n', arguments: {} })).json.input;
+    const fl = (await call('PUT', `/api/connections/${id}/flags`, { kind: 'tool', name: 't' })).json.flag;
+    assert.equal((await call('DELETE', `/api/connections/${b}/inputs/${inp.id}`)).status, 404, 'another connection cannot delete it');
+    assert.equal((await call('DELETE', `/api/connections/${b}/flags/${fl.id}`)).status, 404);
+    assert.equal((await call('DELETE', `/api/connections/${id}/inputs/${inp.id}`, undefined, { origin: 'http://evil.example' })).status, 403);
+    assert.equal((await call('DELETE', `/api/connections/${id}/flags/${fl.id}`, undefined, { origin: 'http://evil.example' })).status, 403);
+    assert.equal((await call('GET', `/api/connections/${id}/inputs`)).json.inputs.length, 1);
+    assert.equal((await call('GET', `/api/connections/${id}/flags`)).json.flags.length, 1);
+    for (const odd of ['__proto__', 'constructor', 'toString']) {
+      assert.equal((await call('POST', `/api/connections/${odd}/inputs`, { tool: 't', name: 'n', arguments: {} })).status, 404, odd);
+      assert.equal((await call('PUT', `/api/connections/${odd}/flags`, { kind: 'tool', name: 't' })).status, 404, odd);
+    }
+    assert.equal((await call('GET', `/api/connections/${id}/inputs?tool[]=x`)).status, 400);
+  });
+});

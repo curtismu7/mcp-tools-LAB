@@ -160,7 +160,8 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   // ---- saved inputs: named argument sets per tool. Loading one fills the call form; the confirm gate still applies.
   api.get('/connections/:id/inputs', (req, res) => {
     const conn = connection(req, res); if (!conn) return;
-    const tool = typeof req.query.tool === 'string' ? req.query.tool : undefined;
+    if (req.query.tool !== undefined && typeof req.query.tool !== 'string') return bad(res, 'tool must be one tool name');
+    const tool = req.query.tool;
     res.set('Cache-Control', 'no-store').json({ inputs: inputs.list(conn.id, tool) });
   });
   api.post('/connections/:id/inputs', small, (req, res) => {

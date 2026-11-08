@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { del, get, post, pretty } from "../lib/api.js";
 import { estimateTokens, TOKEN_NOTE } from "../lib/tokens.js";
 import { Untrusted } from "../lib/Untrusted.jsx";
@@ -8,7 +8,7 @@ import { SEV } from "./ScanResult.jsx";
 
 // Pick a tool, fill the form, Review call -> the server returns the canonical arguments and their hash -> the dialog shows
 // exactly that text -> only the Send click posts {confirm:true, argsHash}. Changing the tool or any value drops the preview.
-export default function CallPanel({ connectionId, tools, scanned, flaggedBy }) {
+export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning }) {
   const [name, setName] = useState("");
   const [values, setValues] = useState({});
   const [raw, setRaw] = useState("{}");
@@ -24,14 +24,22 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy }) {
 
   useEffect(() => { setValues({}); setRaw("{}"); setReview(null); setError(null); setResult(null); setSavedNote(""); }, [name, connectionId]);
   const base = `/api/connections/${encodeURIComponent(connectionId)}`;
+  const want = useRef(""); // the tool the newest request is for: a late answer for another tool is dropped
   const loadSaved = useCallback(async () => {
+    want.current = name;
     if (!name) { setSaved([]); return; }
     const r = await get(`${base}/inputs?tool=${encodeURIComponent(name)}`);
-    setSaved(r.ok ? r.data.inputs || [] : []);
+    if (want.current !== name) return;
+    setSaved(r.ok ? (r.data.inputs || []).filter((x) => x.tool === name) : []);
   }, [base, name]);
-  useEffect(() => { if (scanned) loadSaved(); }, [loadSaved, scanned]);
+  useEffect(() => { setSaved([]); if (scanned) loadSaved(); }, [loadSaved, scanned]);
 
-  if (!scanned) return <p className="muted" data-testid="call-locked">Scan first. Calls unlock after a scan of this server in this session.</p>;
+  if (!scanned) return (
+    <div data-testid="call-locked">
+      <p className="muted">Calls unlock after a scan of this server in this session, so you read the findings before anything runs.</p>
+      {onScan && <button type="button" className="btn primary" onClick={onScan} disabled={scanning}>{scanning ? "Scanning..." : "Scan now"}</button>}
+    </div>
+  );
 
   const flagged = tool ? flaggedBy(tool.name) : null;
 

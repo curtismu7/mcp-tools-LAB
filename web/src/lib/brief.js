@@ -1,7 +1,9 @@
 // The review brief: a Markdown file for a coding agent (or a person) listing what the operator flagged on one server,
 // with the server's own definitions and the scan findings. Everything that came from the server, and the operator's
 // notes, goes inside a fenced block that no backtick run in the text can close, with invisible characters made
-// visible, under a header that says it is untrusted data. The brief must not pass on the poison it reports.
+// visible, under a header that says it is untrusted data. Names and notes are written as one-line JSON strings, so no
+// line break from a server (or a note) can start a line that looks like a heading or a fence to an agent reading the
+// raw text. The brief must not pass on the poison it reports.
 import { visible } from "./Untrusted.jsx";
 import { estimateTokens } from "./tokens.js";
 
@@ -45,7 +47,7 @@ export function buildBrief({ conn, listed, report, flags, now = new Date() }) {
   flags.forEach((flag, i) => {
     const def = definition(flag, listed);
     const own = findings.filter((f) => f.subject === subjectOf(flag));
-    out.push(`### ${i + 1}. ${flag.kind}`, "", "Name:", "", fence(flag.name), "", "Operator note:", "", flag.note ? fence(flag.note) : "(no note)", "");
+    out.push(`### ${i + 1}. ${flag.kind}`, "", "Name:", "", fence(JSON.stringify(flag.name), "json"), "", "Operator note:", "", flag.note ? fence(JSON.stringify(flag.note), "json") : "(no note)", "");
     out.push("Definition from the server:", "", def ? fence(json(def), "json") : "(not in the last listing: it may have been removed or renamed since)", "");
     out.push(`Scan findings on this item: ${own.length}`, "");
     if (own.length) out.push(fence(json(own.map(({ ruleId, severity, kind, detail, evidence }) => ({ ruleId, severity, kind, detail, evidence }))), "json"), "");

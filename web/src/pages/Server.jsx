@@ -192,12 +192,12 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
 
       <h3>Review brief</h3>
       <div className="card" data-testid="brief">
-        <p className="small">Flag tools, resources or prompts above with a note, then download a Markdown brief for a coding agent or a reviewer: your notes, the server's definitions and the scan findings. Server text sits in fenced blocks marked as untrusted data, so the brief does not pass the poison on. {flags.length} flagged.</p>
+        <p className="small">Flag tools, resources or prompts above with a note, then download a Markdown brief for a coding agent or a reviewer: your notes, the server's definitions and the scan findings. Server text sits in fenced blocks marked as untrusted data, so the brief does not pass the poison on. {flags.length} flagged{flags.length ? "" : ": with nothing flagged the brief still lists every scan finding"}{report ? "" : ". Scan first to include findings"}.</p>
         <div className="controls">
-          <button type="button" className="btn" disabled={!flags.length} onClick={() => setBriefNote(`Downloaded ${downloadBrief(buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags }), conn.label)}.`)}>Download review brief (Markdown)</button>
+          <button type="button" className="btn" onClick={() => setBriefNote(`Downloaded ${downloadBrief(buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags }), conn.label)}.`)}>Download review brief (Markdown)</button>
           {briefNote && <span className="small" role="status">{briefNote}</span>}
         </div>
-        {flags.length > 0 && (
+        {(flags.length > 0 || report) && (
           <details>
             <summary className="small">Preview the brief</summary>
             <Untrusted block text={buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags })} />
@@ -207,7 +207,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
 
       <h3>Call a tool</h3>
       <div className="card">
-        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} />
+        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
       </div>
 
       <details className="card" data-admin-only>
