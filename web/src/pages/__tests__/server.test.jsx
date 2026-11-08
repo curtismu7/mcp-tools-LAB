@@ -235,3 +235,28 @@ describe("Server page: locked calls", () => {
     expect(screen.queryByTestId("call-locked")).toBeNull();
   });
 });
+
+describe("Server page: Run on a tool card", () => {
+  it("selects that tool in the call panel and sends nothing; Review and confirm still apply", async () => {
+    mockServer({ "POST /api/connections/c1/scan": () => ({ report: REPORT, listed: { tools: TOOLS, resources: [], prompts: [] } }) });
+    const user = userEvent.setup();
+    await openServer(user);
+    await user.click(screen.getByRole("button", { name: "Scan" }));
+    await screen.findByTestId("scan-result");
+    await user.click(screen.getByRole("button", { name: "Run get_weather" }));
+    expect(screen.getByLabelText("Tool")).toHaveValue("get_weather");
+    expect(sent("POST /api/connections/c1/call")).toHaveLength(0);
+    expect(sent("POST /api/connections/c1/call/preview")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Review call" })).toBeInTheDocument();
+  });
+
+  it("before a scan, Run picks the tool and the locked panel offers Scan now; after the scan the tool is still picked", async () => {
+    mockServer({ "POST /api/connections/c1/scan": () => ({ report: REPORT, listed: { tools: TOOLS, resources: [], prompts: [] } }) });
+    const user = userEvent.setup();
+    await openServer(user);
+    await user.click(await screen.findByRole("button", { name: "Run get_weather" }));
+    await user.click(within(screen.getByTestId("call-locked")).getByRole("button", { name: "Scan now" }));
+    await screen.findByTestId("scan-result");
+    expect(screen.getByLabelText("Tool")).toHaveValue("get_weather");
+  });
+});

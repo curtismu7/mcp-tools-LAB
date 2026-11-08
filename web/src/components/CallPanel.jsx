@@ -8,7 +8,8 @@ import { SEV } from "./ScanResult.jsx";
 
 // Pick a tool, fill the form, Review call -> the server returns the canonical arguments and their hash -> the dialog shows
 // exactly that text -> only the Send click posts {confirm:true, argsHash}. Changing the tool or any value drops the preview.
-export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning }) {
+// `pick` ({name, at}) comes from a Run button on a tool card: it selects that tool here. It never sends anything.
+export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick }) {
   const [name, setName] = useState("");
   const [values, setValues] = useState({});
   const [raw, setRaw] = useState("{}");
@@ -22,6 +23,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
   const tool = (tools || []).find((t) => t.name === name);
   const fields = useMemo(() => fieldsOf(tool?.inputSchema), [tool]);
 
+  useEffect(() => { if (pick?.name) setName(pick.name); }, [pick]);
   useEffect(() => { setValues({}); setRaw("{}"); setReview(null); setError(null); setResult(null); setSavedNote(""); }, [name, connectionId]);
   const base = `/api/connections/${encodeURIComponent(connectionId)}`;
   const want = useRef(""); // the tool the newest request is for: a late answer for another tool is dropped

@@ -49,6 +49,9 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
   }
   async function removeFlag(flag) { await del(`${base}/flags/${encodeURIComponent(flag.id)}`); loadFlags(); }
   const flagProps = { onSave: saveFlag, onRemove: removeFlag, disabled: mockOnly };
+  const [pick, setPick] = useState(null); // a Run button's tool, handed to the call panel
+  const callRef = useRef(null);
+  const run = (name) => { setPick({ name, at: Date.now() }); callRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); };
 
   const remember = useCallback((list) => { seen.current = new Map((list || []).map((t) => [t.name, sigOf(t)])); }, []);
   // Compare a new list with the one last shown; a tool whose text changed is the rug-pull signal.
@@ -174,6 +177,9 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
                         <summary className="small">Input schema (shown as text)</summary>
                         <Untrusted block text={pretty(t.inputSchema ?? null)} />
                       </details>
+                      <div className="flag-row">
+                        <button type="button" className="btn" onClick={() => run(t.name)} aria-label={`Run ${t.name}`}>Run</button>
+                      </div>
                       <FlagControl kind="tool" name={t.name} flag={flagOf("tool", t.name)} {...flagProps} />
                     </li>
                   );
@@ -205,9 +211,9 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
         )}
       </div>
 
-      <h3>Call a tool</h3>
+      <h3 ref={callRef} tabIndex={-1}>Call a tool</h3>
       <div className="card">
-        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
+        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} pick={pick} />
       </div>
 
       <details className="card" data-admin-only>
