@@ -333,3 +333,12 @@ test('live mode: a sample connection lists its tools and answers a confirmed cal
     assert.equal((await call('DELETE', `/api/connections/${id}`)).status, 204);
   });
 });
+
+test('GET /api/shelf returns SHELF_URL (slash trimmed) with no web build; POST is not 200', async () => {
+  await withApp({ env: { SHELF_URL: 'https://shelf.example:8443/', HOME: '/nonexistent' } }, async ({ call }) => {
+    const res = await call('GET', '/api/shelf');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { shelfUrl: 'https://shelf.example:8443' });
+    assert.notEqual((await call('POST', '/api/shelf', {})).status, 200);
+  });
+});
