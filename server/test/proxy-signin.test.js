@@ -79,7 +79,7 @@ test('403 with the scopes a call needs (JSON-RPC data): names the missing scope 
     const r = await callOf(app, id);
     assert.equal(r.status, 403); assert.equal(r.json.error, 'mcp_scope_needed');
     assert.match(r.json.message, /needs the scope invest:read, which this sign-in does not have \(it has: tools:read\)/);
-    assert.match(r.json.message, /MCPTOOLS_P1_SCOPES/); assert.match(r.json.message, /only if the server lists it/); assert.ok(r.json.message.length <= 300, `the reply is clipped at 300 characters: ${r.json.message.length}`);
+    assert.match(r.json.message, /MCPTOOLS_P1_SCOPES/); assert.match(r.json.message, /only if the server lists it/); assert.match(r.json.message, /then sign in again\.$/, 'the advice reaches its last sentence: replies are clipped at 300 characters');
     assert.ok(!r.json.message.includes('tools:read, '), 'a scope the sign-in already has is not listed as missing');
   } finally { await app.close(); }
 });
