@@ -74,7 +74,7 @@ function Shell() {
         </label>
       </header>
       <PresentBar />
-      <ReleaseBanner config={config} />
+      <ReleaseBanner config={config} source={modeInfo?.source || "mock"} />
       {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
       {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
       <main className="page" id="main" tabIndex={-1}>
