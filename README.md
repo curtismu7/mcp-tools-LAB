@@ -16,7 +16,7 @@ Press Scan on a connected server, read the findings with their evidence, and onl
 
 ## Status
 
-Built and tested. On a clean clone with nothing else checked out, `npm test` runs 158 server tests (156 always-on, all pass) and 89 web tests, plus 2 optional server tests that are reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`, and the full-swagger check of the release-claim names, which needs `SWAGGER_FILE`); with a `hostile-mcp` checkout and the swagger file those run too, 158 of 158. The same counts hold on Node 22. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
+Built and tested. On a clean clone with nothing else checked out, `npm test` runs 177 server tests (175 always-on, all pass) and 101 web tests on Node 26, plus 2 optional server tests that are reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`, and the full-swagger check of the release-claim names, which needs `SWAGGER_FILE`); with a `hostile-mcp` checkout and the swagger file those run too. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
 
 
 
@@ -39,6 +39,19 @@ Not verified:
 **Ping release claim (2026-11-02), UNVERIFIED on our tenant.** The Entitled listing page and the third run on the diagram simulate what Ping's release is said to add to MCP gateways: a tool the caller is not entitled to is removed from `tools/list` and refused again when called by name, and an aggregate of member MCP servers (tools named `alias__tool`) has one policy that caps every member, enforced on the listing and again at the member hop. An unreachable member is reported, not dropped. The SE gateway (v1.261030) does not have the release, so **there is no live path for this feature**: it is a simulation in this process (no socket, no outbound call), the same in the live inspector and in the hosted mock. A banner says so on every tab and in presenter mode.
 
 A scan of a filtered list covers only what that caller sees, so a clean result is not clean for other callers; the scan notes and the Limits page say so. Names from the console swagger (`Members`, `AppRef`, `Alias`, `ToolFilter`, AppType `mcp-aggregate`) are tagged as schema names only; the entitlement behaviour and the cap have no swagger field and are tagged as deck claims. Full tagging, the talk track and the tests: [docs/entitled-listing.md](docs/entitled-listing.md). `npm run mutate` checks that each policy field and rule is really tested.
+
+## Live proxy (flow log)
+
+The Live proxy page turns this tool into a local debugging passthrough, so you can see what an agent really sends. Turn it on, copy the `claude mcp add ...` command shown for a server, and use that server from Claude Code (any MCP client that can send a header works). Every JSON-RPC message then shows up in the Live flow table with route, method, status, time and an estimated token cost in each direction; open a row to see the headers and both bodies.
+
+- One URL per server on this tool's own port: `http://127.0.0.1:4810/proxy/mcp/<id>`. No extra port.
+- Off by default. Turning it on mints a random proxy token that the client sends as `Authorization: Bearer ...`; turning it off, Reset or a restart ends it. The client's header is never forwarded: the server gets the saved connection's own credential, which stays write-only. Neither token is kept in the flow log.
+- Mock mode offers the two built-in sample servers only, answered in this process. Real adds your saved servers: http servers are a raw passthrough (SSE streams included, redirects refused); stdio and PingOne connections are bridged through this tool's own client.
+- It is not a gateway and enforces no policy. **The confirm step of the Server page does not apply to calls an agent makes through the proxy.**
+- The log keeps the last 200 flows in memory only, bodies capped at 64 KB. Token counts are characters / 4, an estimate and not a tokenizer.
+- Not built: one aggregate URL for all servers, and running OAuth for the client (a server that needs an OAuth sign-in has to be saved with a token first).
+
+Checked by hand on 2026-11-07: the official MCP Inspector CLI (`@modelcontextprotocol/inspector` 2.14.0, `--cli --transport http --header`) listed tools and called a tool through the proxy, and was refused without the token.
 
 ## Run it
 
@@ -91,6 +104,7 @@ This tool connects to servers the operator names, so it is built to be careful. 
 - stdio runs only a command typed into the UI this session: no shell, a minimal environment plus the env the operator typed, kept in memory and never written to disk or read from it.
 - Redirects from a server are never followed (an auth header must not travel).
 - Everything from a server is rendered as text. The page sends a strict CSP.
+- The live proxy is off by default, needs its own per-session token on every request, refuses a browser `Origin` from another site, never forwards the client's `Authorization` header and never logs either token. The confirm gate does not cover calls made through it.
 
 More in [docs/security.md](docs/security.md).
 

@@ -19,6 +19,7 @@ import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
 import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } from './mock.js';
 import { createPingone } from './pingone.js';
+import { createProxy } from './proxy/router.js';
 import { clip, scrub, scrubJson } from './redact.js';
 import { analyze, buildReport, parseSnapshot, SnapshotError } from './scanner/index.js';
 import { collectFromClient } from './scanner/live.js';
@@ -88,6 +89,9 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     ...(mock ? { realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.' } : { realReason: null }),
   });
   let mode = 'mock';
+  // Live proxy (Peek-style flow log). Its control API is under /api/proxy; the proxy itself is /proxy/mcp/<id> (below).
+  const liveProxy = createProxy({ store, manager, getMode: () => mode, mockOnly: mock, secretsFor });
+  api.use('/proxy', liveProxy.api);
   api.get('/info', (_req, res) => res.set('Cache-Control', 'no-store').json(modeView()));
   api.post('/mode', small, (req, res) => {
     const body = req.body ?? {};
@@ -137,6 +141,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   // are virtual, so the answer there is honest ("nothing stored").
   // Reset (rule 3): POST /api/reset clears every saved connection in this instance's store.
   api.post('/reset', wrap(async (_req, res) => {
+    liveProxy.reset(); // proxy off, its token gone, flow log cleared
     if (store.file === null) return res.json({ ok: true, cleared: 0, note: 'mock-only: nothing is stored' });
     const ids = store.list().map((c) => c.id);
     for (const id of ids) await manager.remove(id);
@@ -259,6 +264,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   });
   app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
   app.use('/api', api);
+  app.use('/proxy', liveProxy.proxy); // MCP clients send no Origin: the proxy has its own guards (proxy/router.js)
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
     app.use(express.static(WEB_DIST));

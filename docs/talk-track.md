@@ -30,6 +30,10 @@ Open the offline mode and paste or load a `tools/list` JSON snapshot — or an A
 
 Only now call something. The call panel builds a form from the tool's schema; the confirm dialog shows exactly the arguments about to be sent. Under the hood, `tools/call` needs `{confirm:true, argsHash}` — the hash of the arguments you were shown. No confirm is 428; a mismatched hash is 409. Nothing reaches the server first.
 
+## Watch an agent through the live proxy
+
+Open Live proxy, turn it on and copy the Claude Code command for the hostile sample. Add it in Claude Code and ask the agent to use the weather tool: every message shows up in the Live flow table, and the `tools/list` row shows how many tokens the poisoned descriptions cost the agent's context before it does anything. Open the row to show the hidden instruction arriving. Say it plainly: the proxy only watches; it is not a gateway, and the confirm step does not apply to the agent's calls.
+
 ## The entitlement simulation
 
 Open the Entitled listing tab and the diagram. A banner says it on every tab: this simulates what Ping's release is said to add — a tool the caller is not entitled to is removed from `tools/list` and refused again when called by name, and an aggregate of member servers (tools named `alias__tool`) has one policy capping every member. It is a simulation in this process; there is no live path, and it is UNVERIFIED on our tenant.

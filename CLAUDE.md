@@ -13,7 +13,8 @@ Tier: Tester. Connect to an MCP server, list what it offers, scan the metadata f
 - UI: the vendored `web/src/standalone-ui.css` must stay byte-identical to `~/Development/AI-DEMO-Standalone/shared/standalone-ui.css`; no local colour literals (use its tokens), no `prefers-color-scheme` outside it, no `!important`. Run `check-css.sh` and `check-drift.sh` from the parent repo before a PR. Rule 19 Mock/Real toggle: `POST /api/mode` takes exactly `{source}`, `GET /api/info` answers `{source, realAvailable, realReason?}`; Real is 409-refused on a `MOCK_ONLY=1` hosted copy with the honest reason and the header button is aria-disabled with that tooltip.
 - Product claims about the Ping release are simulated and UNVERIFIED on our tenant; say so. Never say "door" (say P1 Privilege Agent App).
 - The forbidden-strings gate (`npm run check:forbidden`, CI job `forbidden-strings`, secret `FORBIDDEN_STRINGS`) prints counts only. CI is GitHub-hosted, Node 26 only: build, forbidden-strings, gitleaks. Docker is OrbStack, never Docker Desktop. The SE k8s mock build is deferred.
-- Commits end with the Co-Authored-By line from the session's attribution reminder.
+- No AI attribution anywhere (owner, 2026-11-07): no Co-Authored-By trailer and no "Generated with" line in commits, PR bodies or files; CI runs `scripts/check-no-ai-attribution.sh`.
+- Live proxy (`server/src/proxy/`): off by default, per-session proxy token, cross-site Origin refused, the client's Authorization never forwarded, neither token logged, Mock = fixtures only. It bypasses the confirm gate by design; keep the docs saying so.
 
 ## Shelf
 `docs/shelf-entry.json` registers the app (D3 and D4, one app; tag `mcp-server-built`).

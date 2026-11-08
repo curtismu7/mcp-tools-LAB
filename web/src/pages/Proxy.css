@@ -1,0 +1,12 @@
+.proxy__scroll { overflow-x: auto; max-width: 100%; }
+.proxy__table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.proxy__table th, .proxy__table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.proxy__table tr[aria-selected="true"] td { background: var(--surface-2); }
+.proxy__pre { white-space: pre-wrap; word-break: break-word; max-height: 24rem; overflow: auto; font-size: 0.85rem; }
+.proxy__cmd { max-height: none; }
+.proxy__routes { list-style: none; padding: 0; display: grid; gap: 0.75rem; }
+.proxy__kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.75rem; font-size: 0.85rem; }
+.proxy__kv dt { color: var(--muted); }
+.proxy__kv dd { margin: 0; word-break: break-all; }
+.proxy__cols { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.linkish { background: none; border: 0; padding: 0; color: var(--text); text-decoration: underline; cursor: pointer; font: inherit; }
