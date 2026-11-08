@@ -185,7 +185,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
                       </div>
                       {running === t.name && (
                         <div className="inline-run" data-testid="inline-run">
-                          <CallPanel key={t.name} connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} fixedTool={t.name} />
+                          <CallPanel key={t.name} connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} fixedTool={t.name} />
                         </div>
                       )}
                       <FlagControl kind="tool" name={t.name} flag={flagOf("tool", t.name)} {...flagProps} />
@@ -221,7 +221,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
 
       <h3>Call a tool</h3>
       <div className="card">
-        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
+        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
       </div>
 
       <details className="card" data-admin-only>

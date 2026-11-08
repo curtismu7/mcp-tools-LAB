@@ -13,7 +13,9 @@ export const P1_KEYS = ['PINGONE_ENVIRONMENT_ID', 'PINGONE_REGION', 'PINGONE_MCP
 export function p1Config(env = process.env) {
   const environmentId = String(env.PINGONE_ENVIRONMENT_ID || '').trim();
   const region = REGION_ALIASES[String(env.PINGONE_REGION || '').trim().toLowerCase()] || 'com';
-  const issuer = String(env.MCPTOOLS_P1_ISSUER || '').trim() || (environmentId ? `https://auth.pingone.${region}/${environmentId}/as` : null);
+  let override = String(env.MCPTOOLS_P1_ISSUER || '').trim();
+  try { const u = new URL(override); if (!(u.protocol === 'https:' || (u.protocol === 'http:' && /^(127(\.\d+){3}|localhost|\[?::1\]?)$/.test(u.hostname)))) override = ''; } catch { override = ''; } // a password never goes over plain http to a non-loopback host
+  const issuer = override || (environmentId ? `https://auth.pingone.${region}/${environmentId}/as` : null);
   return { environmentId, region, issuer, clientId: String(env.PINGONE_MCP_CLIENT_ID || '').trim() || null };
 }
 export const sameIssuer = (a, b) => Boolean(a && b) && String(a).replace(/\/$/, '') === String(b).replace(/\/$/, '');

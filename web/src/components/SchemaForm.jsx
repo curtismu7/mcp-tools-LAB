@@ -2,9 +2,10 @@ import React, { useMemo } from "react";
 import { Untrusted } from "../lib/Untrusted.jsx";
 import { sourceLabel } from "../lib/suggest.js";
 
-// A form from a tool's inputSchema. The schema is untrusted text: names and descriptions are rendered as text only, and a
-// schema `default` is NEVER filled in (an off-box default is the classic exfil sink); it is shown beside the field and
-// the field is left empty, so only what the operator types is sent.
+// A form from a tool's inputSchema. The schema is untrusted text: names and descriptions are rendered as text only. A
+// schema `default` is filled in only by lib/suggest.js, under its narrow rules (a required field, plain words, never on a
+// flagged tool); otherwise it is shown beside the field and the field is left empty, so only what the operator types or
+// confirms is sent.
 const MAX_FIELDS = 40;
 const typeOf = (p) => (Array.isArray(p?.type) ? p.type.find((t) => t !== "null") : p?.type);
 

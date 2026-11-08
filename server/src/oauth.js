@@ -66,7 +66,7 @@ export function parseChallenge(header) {
 
 export function createOAuth({ env = {}, now = Date.now } = {}) {
   const p1 = p1Config(env);
-  const piflow = createPiFlow();
+  const piflow = createPiFlow({ now });
   const sessions = new Map(); // connection id -> { issuer, clientId, clientSecret, accessToken, refreshToken, expiresAt, scope, tokenEndpoint, resource }
   const pending = new Map(); // state -> { connectionId, verifier, redirectUri, issuer, clientId, clientSecret, tokenEndpoint, resource, scope, at }
   const discovered = new Map(); // connection id -> { at, info }
@@ -91,6 +91,11 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
       if (r.status === 200 && r.json && Array.isArray(r.json.authorization_servers)) { prm = r.json; break; }
     }
     if (!prm || !prm.authorization_servers.length) throw new OAuthError('the server asks for a token but publishes no protected-resource metadata naming an authorization server', 'oauth_no_metadata');
+    // RFC 9728: the resource in the metadata must be the server we are talking to. A server must not be able to name another
+    // audience for the token it receives.
+    if (typeof prm.resource === 'string' && prm.resource.replace(/\/$/, '') !== server.toString().replace(/\/$/, '')) {
+      throw new OAuthError('the server names a different resource than its own URL in its metadata; refusing to ask for a token for it', 'oauth_resource_mismatch');
+    }
     const issuer = checkedUrl(prm.authorization_servers[0], 'the authorization server');
     const ours = sameIssuer(issuer.toString(), p1.issuer);
     if (ours && !p1.clientId) {
@@ -120,7 +125,7 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
       authorizationEndpoint: endpoint(meta.authorization_endpoint, 'the authorization endpoint'),
       tokenEndpoint: endpoint(meta.token_endpoint, 'the token endpoint'),
       registrationEndpoint: meta.registration_endpoint ? endpoint(meta.registration_endpoint, 'the registration endpoint') : null,
-      resource: typeof prm.resource === 'string' ? prm.resource : server.toString(),
+      resource: server.toString(), // always the connection's own URL, never what the server says
       scopes: (challenge.scope ? challenge.scope.split(' ') : Array.isArray(prm.scopes_supported) ? prm.scopes_supported : []).filter(Boolean).slice(0, 30),
       issParameter: meta.authorization_response_iss_parameter_supported === true,
     };
@@ -196,7 +201,10 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
     const info = await discover(conn, { fresh: true });
     if (info.method !== 'piflow') throw new OAuthError('this server does not sign in with our PingOne environment', 'oauth_not_piflow');
     if (info.refused) throw new OAuthError(info.refused, 'oauth_needs_client_id');
-    const scope = ['openid', ...info.scopes.filter((x) => x !== 'openid')].join(' ');
+    // A server must not choose what our PingOne grants: only scopes listed in MCPTOOLS_P1_SCOPES (default: none beyond
+    // openid) are requested, whatever the server asks for.
+    const allowed = new Set(String(env.MCPTOOLS_P1_SCOPES || '').split(/[\s,]+/).filter(Boolean));
+    const scope = ['openid', ...info.scopes.filter((x) => x !== 'openid' && allowed.has(x))].join(' ');
     const base = { issuer: info.issuer, clientId: p1.clientId, clientSecret: null, tokenEndpoint: info.tokenEndpoint, resource: info.resource, scope };
     return piflow.start({ key: conn.id, meta: { issuer: info.issuer, authorizationEndpoint: info.authorizationEndpoint, tokenEndpoint: info.tokenEndpoint }, clientId: p1.clientId, redirectUri, resource: info.resource, scope, onTokens: (id, t) => keep(id, t, base) });
   }

@@ -74,6 +74,68 @@ describe("the call form fills in what a person would not know", () => {
     expect(await screen.findByTestId("pick-choices")).toBeInTheDocument();
   });
 
+  it("fills nothing, and asks nothing, before the scan; a flagged tool gets nothing from any source", async () => {
+    const user = userEvent.setup();
+    const flaggedReport = { ...REPORT, findings: [{ ruleId: "MT-HI-001", severity: "high", kind: "hidden-instruction", subject: "get_account_balance", detail: "x", evidence: [] }] };
+    mockServer({
+      "GET /api/connections/c1/tools": () => ({ tools: TOOLS }),
+      "POST /api/connections/c1/scan": () => ({ report: flaggedReport, listed: { tools: TOOLS, resources: [], prompts: [] } }),
+      "GET /api/connections/c1/fill": () => ({ demo: { city: "Austin" }, identity: { sub: "user-42" } }),
+    });
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: /^Open Evil/ }));
+    await user.click(await screen.findByRole("button", { name: "Run get_account_balance" }));
+    await within(await screen.findByTestId("inline-run")).findByTestId("call-locked"); // the page-level panel is locked too: look in the card
+    expect(sent("GET /api/connections/c1/fill")).toHaveLength(0); // before the scan: nothing is even asked
+    await user.click(within(screen.getByTestId("inline-run")).getByRole("button", { name: "Scan now" }));
+    await screen.findByTestId("scan-result");
+    const card = screen.getByTestId("inline-run");
+    await within(card).findByLabelText(/^city/);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(within(card).getByLabelText(/^city/)).toHaveValue("");
+    expect(within(card).getByLabelText(/^user_id/)).toHaveValue("");
+    expect(within(card).queryByTestId("filled-city")).toBeNull();
+  });
+
+  it("holds fill and Pick back when the tool list changed after the scan (a rug-pull)", async () => {
+    const user = userEvent.setup();
+    let list = TOOLS;
+    mockServer({
+      "POST /api/connections/c1/scan": () => ({ report: { ...REPORT, findings: [] }, listed: { tools: TOOLS, resources: [], prompts: [] } }),
+      "GET /api/connections/c1/tools": () => ({ tools: list }),
+      "GET /api/connections/c1/fill": () => ({ demo: { city: "Austin" }, identity: null }),
+    });
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: /^Open Evil/ }));
+    await user.click(await screen.findByRole("button", { name: "Scan" }));
+    await screen.findByTestId("scan-result");
+    list = TOOLS.map((t) => (t.name === "get_account_balance" ? { ...t, description: "now different" } : t)); // changed after the scan
+    await user.click(screen.getByRole("button", { name: "Refresh list" }));
+    await screen.findByTestId("changed");
+    await user.click(screen.getByRole("button", { name: "Run get_account_balance" }));
+    const card = screen.getByTestId("inline-run");
+    await within(card).findByLabelText(/^city/);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(within(card).getByLabelText(/^city/)).toHaveValue("");
+    expect(within(card).queryByTestId("pick-account_id")).toBeNull();
+  });
+
+  it("the confirm shows the exact call as text with invisible and bidi characters made visible", async () => {
+    const user = userEvent.setup();
+    await open(user);
+    await user.click(screen.getByRole("button", { name: "Run get_account_balance" }));
+    const card = screen.getByTestId("inline-run");
+    await user.click(await within(card).findByTestId("pick-account_id"));
+    await user.click(await screen.findByRole("button", { name: "Send lookup" }));
+    await screen.findByTestId("pick-choices");
+    await user.type(within(card).getByLabelText(/^account_id/), "abc\u202edef");
+    await user.type(within(card).getByLabelText(/^callback/), "x");
+    await user.click(within(card).getByRole("button", { name: "Review call" }));
+    const text = (await screen.findByTestId("canonical")).textContent;
+    expect(text).toContain("abc[U+202E]def");
+    expect(text).not.toContain("\u202e");
+  });
+
   it("does not offer Pick when the list tool was flagged by the scan", async () => {
     const user = userEvent.setup();
     const flaggedReport = { ...REPORT, findings: [{ ruleId: "MT-HI-001", severity: "high", kind: "hidden-instruction", subject: "get_my_accounts", detail: "x", evidence: [] }] };

@@ -299,7 +299,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
       send(res, conn, {
         report,
         listed: {
-          tools: got.tools.map((t) => ({ name: t?.name, description: t?.description, inputSchema: t?.inputSchema })),
+          tools: got.tools.map((t) => ({ name: t?.name, description: t?.description, inputSchema: t?.inputSchema, ...(t?.annotations && typeof t.annotations === 'object' && !Array.isArray(t.annotations) ? { annotations: { readOnlyHint: t.annotations.readOnlyHint === true ? true : t.annotations.readOnlyHint === false ? false : undefined, destructiveHint: t.annotations.destructiveHint === true ? true : undefined } } : {}) })),
           resources: got.resources.map((r) => ({ uri: r?.uri, name: r?.name, description: r?.description })),
           prompts: got.prompts.map((p) => ({ name: p?.name, description: p?.description, arguments: p?.arguments })),
         },

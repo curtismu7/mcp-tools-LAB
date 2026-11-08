@@ -62,8 +62,14 @@ export function createPiFlow({ now = Date.now } = {}) {
     return { run: handle, status: run.status, state: CREDENTIAL_STATUSES.has(run.status) ? 'credentials_required' : 'stopped', expiresAt: new Date(run.expiresAt).toISOString(), ...extra };
   }
 
+  // A new run is free, so without a limit a script on the page could try passwords as fast as it can start runs.
+  // At most 5 starts per target per minute; PingOne's own lockout is the second line.
+  const starts = new Map();
   async function start({ key, meta, clientId, redirectUri, resource, scope, onTokens }) {
     sweep();
+    const recent = (starts.get(key) || []).filter((t) => now() - t < 60_000);
+    if (recent.length >= 5) throw new PiFlowError('too many sign-in attempts; wait a minute and try again', 'piflow_rate_limited', 429);
+    starts.set(key, [...recent, now()]);
     for (const [k, r] of runs) if (r.key === key) runs.delete(k); // one sign-in per target at a time
     const verifier = b64url(crypto.randomBytes(32));
     const state = b64url(crypto.randomBytes(24));
@@ -128,7 +134,7 @@ export function createPiFlow({ now = Date.now } = {}) {
       try { const loc = new URL(r.location, run.meta.issuer); answer = Object.fromEntries(['code', 'state', 'error'].filter((k) => loc.searchParams.has(k)).map((k) => [k, loc.searchParams.get(k)])); } catch { answer = null; }
     }
     if (!answer) throw new PiFlowError('PingOne finished the sign-in but returned no code', 'piflow_no_code', 502);
-    if (answer.state !== undefined && answer.state !== run.state) throw new PiFlowError('the sign-in came back with a different state', 'piflow_state_mismatch', 502);
+    if (answer.state !== run.state) throw new PiFlowError('the sign-in came back with a different state', 'piflow_state_mismatch', 502);
     if (answer.error) throw new PiFlowError(`PingOne refused: ${String(answer.error).slice(0, 60)}`, 'piflow_refused', 502);
     if (typeof answer.code !== 'string' || !answer.code) throw new PiFlowError('PingOne returned no code', 'piflow_no_code', 502);
     const body = new URLSearchParams({ grant_type: 'authorization_code', code: answer.code, redirect_uri: run.redirectUri, client_id: run.clientId, code_verifier: run.verifier, ...(run.resource ? { resource: run.resource } : {}) });

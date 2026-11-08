@@ -54,6 +54,10 @@ The Live proxy page turns this tool into a local debugging passthrough, so you c
 - **A Mock/Real switch** empties the flow log and closes open streams; the proxy stays on.
 - **OAuth:** a server that asks for an OAuth token can be signed in to from the Server page (below); the proxy then uses that token upstream.
 
+### Sign in with our PingOne (pi.flow)
+
+A server whose authorization server is our PingOne environment (`PINGONE_ENVIRONMENT_ID` and `PINGONE_REGION` in `~/Development/.env`, client `PINGONE_MCP_CLIENT_ID`) signs in with the standard **Sign in** dialog: pi.flow, no redirect (rule 16). Only those three keys are read from the shared file. The token's audience is always the connection's own URL (a server that names another resource in its metadata is refused), and our PingOne is asked only for `openid` plus scopes listed in `MCPTOOLS_P1_SCOPES` (comma or space separated), whatever the server asks for. At most 5 sign-in starts a minute per connection; MFA and consent steps are not driven (the dialog names the step it stopped at).
+
 ### OAuth sign-in (third-party servers)
 
 When a saved http server answers 401 with OAuth metadata, the Server page shows an **OAuth sign-in** card with the authorization server and scopes. **Sign in** registers this tool with that server (dynamic client registration, or a client id you type) and opens the sign-in in a new tab; the page picks it up when the tab lands back on `http://127.0.0.1:4810/api/oauth/callback`. PKCE S256, `resource`, a single-use state and the `iss` check apply. The token stays in this tool's memory only and is refreshed before it expires. This is a recorded exception to the family's pi.flow-only rule, for third-party servers only: Ping authorization servers are refused. See [docs/rule-16-waiver.md](docs/rule-16-waiver.md).
@@ -70,7 +74,8 @@ Most people will not know an account id or a user id, so the call form fills in 
 - **Signed-in user:** `user_id`, `email` and `username` fields take the claims of the signed-in identity (pi.flow or OAuth), never the token.
 - **Demo values** for our own servers (`server/data/sample-values.json`: city, symbol and similar plain text; never ids or secrets).
 - **Pick:** for an id field such as `account_id`, **Pick account_id from the server** finds the server's own read-only list tool (for example `get_my_accounts`), shows the exact call and asks you once, then offers the real ids to choose from. Not offered when the scan flagged the list tool.
-- **Schema values:** a *required* field takes the schema's own default, example or first enum value, only when it is plain text (never a URL, address, host, path or markup) and never on a tool the scan flagged. This relaxes the old rule that a schema default is never filled; the owner asked for it (2026-11-07).
+- **Schema values:** a *required* field takes the schema's own default, example or first enum value, only when it is plain words (letters, digits, spaces and a few word marks; never anything that can be a host, address, scheme, path, email, markup or template, and no invisible or lookalike characters) and never on a tool the scan flagged. Nothing at all is filled, from any source, on a flagged tool, or while the last scan no longer covers the tool list (after a rug-pull) or before a scan. This relaxes the old rule that a schema default is never filled; the owner asked for it (2026-11-07).
+- **Pick** only uses a tool with no required arguments that the server does not mark as destructive or not read-only; the dialog says whether the server marks it read-only. An id with an invisible or bidi character is never offered.
 
 ### Flags and the review brief
 

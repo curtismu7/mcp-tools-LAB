@@ -23,8 +23,8 @@ describe("the standard Sign in dialog (pi.flow)", () => {
     const dialog = await screen.findByRole("dialog", { name: "Sign in" });
     expect(dialog).not.toHaveAttribute("aria-modal");
     expect(document.querySelector(".modal-backdrop, .signin-backdrop")).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Username")).toBeEnabled()); // the start request is done
     const submit = screen.getByRole("button", { name: "Sign in" });
-    await waitFor(() => expect(screen.getByLabelText("Username")).toBeEnabled());
     await user.type(screen.getByLabelText("Username"), "alice");
     expect(submit).toBeDisabled();
     await user.type(screen.getByLabelText("Password"), "wrong");
