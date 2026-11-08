@@ -18,6 +18,80 @@
       "authHeader": "Authorization",
       "note": "Poisoned on purpose. The scanner should flag it.",
       "start": "cd hostile-mcp-LAB && npm start    (or: HOST_PORT=4701 docker compose up -d)"
+    },
+    {
+      "id": "banking-mcp",
+      "label": "Banking MCP server (AI-DEMO2 mcp-server)",
+      "transport": "http",
+      "url": "http://127.0.0.1:8080/mcp",
+      "authHeader": "Authorization",
+      "note": "Our banking MCP server: accounts, balances, transfers and many more tools.",
+      "start": "docker start ai-demo-mcp-server    (or ./run-docker.sh in AI-DEMO2)"
+    },
+    {
+      "id": "banking-resource-server",
+      "label": "Banking MCP resource server (AI-DEMO2)",
+      "transport": "http",
+      "url": "http://127.0.0.1:8081/mcp",
+      "authHeader": "Authorization",
+      "note": "The banking resource server: investments, portfolio and related tools.",
+      "start": "docker start ai-demo-mcp-resource-server"
+    },
+    {
+      "id": "weather",
+      "label": "Weather MCP (AI-DEMO2 demo-mcp-weather-bridge)",
+      "transport": "http",
+      "url": "http://127.0.0.1:8896/mcp",
+      "authHeader": "Authorization",
+      "note": "Weather summary, forecast, current conditions and alerts. The tool the Privilege logging cases call.",
+      "start": "docker start ai-demo-mcp-weather"
+    },
+    {
+      "id": "brave",
+      "label": "Brave news search MCP (AI-DEMO2)",
+      "transport": "http",
+      "url": "http://127.0.0.1:8897/mcp",
+      "authHeader": "Authorization",
+      "note": "One tool, brave_news_search. Listing works without a key; calling it needs the Brave key configured in AI-DEMO2.",
+      "start": "docker start ai-demo-mcp-brave"
+    },
+    {
+      "id": "audit",
+      "label": "Audit MCP (AI-DEMO2)",
+      "transport": "http",
+      "url": "http://127.0.0.1:8898/mcp",
+      "authHeader": "Authorization",
+      "note": "Search and summarise audit activity.",
+      "start": "docker start ai-demo-mcp-audit"
+    },
+    {
+      "id": "opensearch",
+      "label": "OpenSearch MCP (SE cluster, through a port-forward)",
+      "transport": "http",
+      "url": "http://127.0.0.1:9900/mcp",
+      "authHeader": "Authorization",
+      "note": "Nine OpenSearch tools (list indices, search, count, cluster health). Runs in the SE cluster; this tunnel makes it reachable on loopback.",
+      "start": "kubectl --context us -n ping-devops-cmuir port-forward svc/opensearch-mcp-server 9900:9900"
+    },
+    {
+      "id": "jwt-verifier",
+      "label": "JWT verifier MCP (AI-DEMO2)",
+      "transport": "http",
+      "url": "http://127.0.0.1:8083/mcp",
+      "authHeader": "Authorization",
+      "note": "Refuses a request with no token, so this one needs a Bearer token.",
+      "start": "docker start ai-demo-mcp-jwt-verifier",
+      "needsToken": true
+    },
+    {
+      "id": "mcp-gateway",
+      "label": "MCP gateway (AI-DEMO2)",
+      "transport": "http",
+      "url": "http://127.0.0.1:3005/mcp",
+      "authHeader": "Authorization",
+      "note": "Our MCP gateway. Refuses a request with no token, so this one needs a Bearer token.",
+      "start": "docker start ai-demo-mcp-gateway",
+      "needsToken": true
     }
   ]
 }

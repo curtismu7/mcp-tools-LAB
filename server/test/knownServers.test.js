@@ -20,7 +20,8 @@ test('the committed list is valid: loopback http servers with a port, unique ids
     assert.ok(u.port, `${s.id} has a port`);
     assert.equal(u.username + u.password, '');
   }
-  assert.ok(list.some((s) => s.id === 'everything') && list.some((s) => s.id === 'hostile-mcp'));
+  for (const id of ['everything', 'hostile-mcp', 'banking-mcp', 'weather', 'opensearch']) assert.ok(list.some((s) => s.id === id), `${id} is listed`);
+  assert.ok(list.filter((s) => s.needsToken).every((s) => s.id === 'jwt-verifier' || s.id === 'mcp-gateway'), 'only the servers that refuse a tokenless request say they need one');
 });
 
 test('validation refuses anything that is not a plain loopback http entry', T, () => {
@@ -33,6 +34,9 @@ test('validation refuses anything that is not a plain loopback http entry', T, (
   assert.throws(() => validateKnownServers(doc(entry({ token: 'Bearer x' }))), /secrets never belong/);
   assert.throws(() => validateKnownServers(doc(entry({ transport: 'stdio' }))), /only http/);
   assert.throws(() => validateKnownServers(doc(entry(), entry())), /duplicate/);
+  assert.throws(() => validateKnownServers(doc(entry({ needsToken: 'yes' }))), /needsToken/);
+  assert.equal(validateKnownServers(doc(entry({ needsToken: true })))[0].needsToken, true);
+  assert.equal(validateKnownServers(doc(entry()))[0].needsToken, false);
   assert.throws(() => validateKnownServers(doc(entry({ id: '../x' }))), /bad or duplicate id/);
 });
 

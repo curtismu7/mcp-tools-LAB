@@ -83,7 +83,8 @@ function ConnectForm({ config, onCreated, onGo }) {
               {known.map((k) => <option key={k.id} value={k.id}>{k.running ? "Running" : "Not running"} - {k.label}</option>)}
             </select>
           </label>
-          {chosen && chosen.running && <p className="small okt" role="status">Running. Every field is filled in: press Connect and test.</p>}
+          {chosen && chosen.running && !chosen.needsToken && <p className="small okt" role="status">Running. Every field is filled in: press Connect and test.</p>}
+          {chosen && chosen.running && chosen.needsToken && <p className="small okt" role="status">Running. This one needs a token: paste it into Auth header value (Bearer ...), then press Connect and test.</p>}
           {chosen && !chosen.running && (
             <p className="small badt" role="status">
               Not running yet. Start it, then check again: <code>{chosen.start}</code>{" "}
