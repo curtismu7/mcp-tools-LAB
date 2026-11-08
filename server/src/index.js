@@ -8,7 +8,7 @@ import { assertBindAllowed, bindHost } from './security.js';
 
 // Local runs read the repo-root .env (real env vars win).
 if (!mockOnly()) { try { process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url))); } catch { /* no .env */ } } // mock-only reads no host files
-if (!mockOnly()) loadSharedP1(); // our PingOne for pi.flow sign-in: three keys from ~/Development/.env, nothing else
+if (!mockOnly()) loadSharedP1(); // our PingOne for pi.flow sign-in: five listed keys from ~/Development/.env (three ids, two settings), nothing else
 
 // Boot on `port` (0 = ephemeral). Refuses a non-loopback host unless MCPTOOLS_BIND is set.
 export function startHttpServer({ port = configPort(), host = bindHost(), app = createApp() } = {}) {

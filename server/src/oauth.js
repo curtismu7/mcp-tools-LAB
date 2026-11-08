@@ -55,6 +55,25 @@ export function checkAudience(accessToken, resource) {
   }
 }
 
+// MCPTOOLS_P1_RESOURCES: "<server URL>=<audience>" pairs (comma or space separated). A server that signs in with our
+// PingOne and names <audience> (not its own URL) in its metadata is asked for a token for <audience>, but ONLY when it is
+// the connection with exactly that URL: a server cannot pick an audience, the operator maps one URL to one audience.
+// An audience on a Ping API host is ignored (that is the token this tool exists to keep away from other servers).
+export function parseResourceMap(raw) {
+  const map = new Map();
+  for (const item of String(raw || '').split(/[\s,]+/).filter(Boolean)) {
+    const cut = item.lastIndexOf('=');
+    if (cut < 1) continue;
+    let url; try { url = new URL(item.slice(0, cut)); } catch { continue; }
+    const aud = item.slice(cut + 1);
+    if (!/^https?:$/.test(url.protocol) || !aud || aud.length > 200) continue;
+    let host = aud; try { host = new URL(aud).hostname; } catch { /* a bare name such as mcp-invest.ping.demo */ }
+    if (isPingHost(host) || /pingone|pingfederate/i.test(aud)) continue; // the raw text too: 'api.pingone.com:443' parses as a scheme with no hostname
+    map.set(trimSlashes(url.toString()), aud);
+  }
+  return map;
+}
+
 function checkedUrl(raw, what) {
   let u;
   try { u = new URL(String(raw)); } catch { throw new OAuthError(`${what} is not a valid URL`); }
@@ -89,6 +108,7 @@ export function parseChallenge(header) {
 
 export function createOAuth({ env = {}, now = Date.now } = {}) {
   const p1 = p1Config(env);
+  const p1Resources = parseResourceMap(env.MCPTOOLS_P1_RESOURCES);
   const piflow = createPiFlow({ now });
   const sessions = new Map(); // connection id -> { issuer, clientId, clientSecret, accessToken, refreshToken, expiresAt, scope, tokenEndpoint, resource }
   const pending = new Map(); // state -> { connectionId, verifier, redirectUri, issuer, clientId, clientSecret, tokenEndpoint, resource, scope, at }
@@ -114,13 +134,16 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
       if (r.status === 200 && r.json && Array.isArray(r.json.authorization_servers)) { prm = r.json; break; }
     }
     if (!prm || !prm.authorization_servers.length) throw new OAuthError('the server asks for a token but publishes no protected-resource metadata naming an authorization server', 'oauth_no_metadata');
-    // RFC 9728: the resource in the metadata must be the server we are talking to. A server must not be able to name another
-    // audience for the token it receives.
-    if (typeof prm.resource === 'string' && prm.resource.replace(/\/$/, '') !== server.toString().replace(/\/$/, '')) {
-      throw new OAuthError('the server names a different resource than its own URL in its metadata; refusing to ask for a token for it', 'oauth_resource_mismatch');
-    }
     const issuer = checkedUrl(prm.authorization_servers[0], 'the authorization server');
     const ours = sameIssuer(issuer.toString(), p1.issuer);
+    // RFC 9728: the resource in the metadata must be the server we are talking to. A server must not be able to name another
+    // audience for the token it receives. One exception: with our PingOne, the operator may have mapped THIS URL to the
+    // audience it declares (MCPTOOLS_P1_RESOURCES); anything else it names is refused.
+    const mapped = ours ? p1Resources.get(trimSlashes(server.toString())) : undefined;
+    const declaresMapped = mapped !== undefined && prm.resource === mapped;
+    if (typeof prm.resource === 'string' && trimSlashes(prm.resource) !== trimSlashes(server.toString()) && !declaresMapped) {
+      throw new OAuthError('the server names a different resource than its own URL in its metadata; refusing to ask for a token for it' + (ours ? ' (to allow one audience for this URL, set MCPTOOLS_P1_RESOURCES=<server URL>=<audience>)' : ''), 'oauth_resource_mismatch');
+    }
     if (ours && !p1.clientId) {
       const info = { required: true, method: 'piflow', refused: 'This server signs in with our PingOne environment (pi.flow). Set PINGONE_MCP_CLIENT_ID in ~/Development/.env to the PingOne application for it, then restart this tool.', issuer: issuer.toString() };
       discovered.set(conn.id, { at: Date.now(), info }); return info;
@@ -148,7 +171,7 @@ export function createOAuth({ env = {}, now = Date.now } = {}) {
       authorizationEndpoint: endpoint(meta.authorization_endpoint, 'the authorization endpoint'),
       tokenEndpoint: endpoint(meta.token_endpoint, 'the token endpoint'),
       registrationEndpoint: meta.registration_endpoint ? endpoint(meta.registration_endpoint, 'the registration endpoint') : null,
-      resource: server.toString(), // always the connection's own URL, never what the server says
+      resource: declaresMapped ? mapped : server.toString(), // the connection's own URL, or the one audience the operator mapped to it; never what the server alone says
       scopes: (challenge.scope ? challenge.scope.split(' ') : Array.isArray(prm.scopes_supported) ? prm.scopes_supported : []).filter(Boolean).slice(0, 30),
       issParameter: meta.authorization_response_iss_parameter_supported === true,
     };
