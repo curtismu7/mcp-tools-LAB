@@ -11,10 +11,11 @@ export const INPUT_LIMITS = { perConnection: 50, nameChars: 80, argBytes: 64 * 1
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 export class InputError extends Error {}
 
-export function createInputStore({ dir = null, connectionExists = () => true } = {}) {
-  const file = dir ? path.join(dir, 'inputs.json') : null;
+// A JSON array file of per-connection records (mode 600 in a mode 700 dir), or memory when dir is null. Records whose
+// connection no longer exists are dropped on every write. Shared by saved inputs and flags.
+export function createListFile({ dir = null, name, connectionExists = () => true }) {
+  const file = dir ? path.join(dir, name) : null;
   let memory = [];
-
   function load() {
     if (!file) return memory;
     try { const v = JSON.parse(fs.readFileSync(file, 'utf8')); return Array.isArray(v) ? v.filter((x) => isObject(x) && typeof x.id === 'string') : []; } catch { return []; }
@@ -28,6 +29,11 @@ export function createInputStore({ dir = null, connectionExists = () => true } =
     fs.chmodSync(tmp, 0o600);
     fs.renameSync(tmp, file);
   }
+  return { load, save, file };
+}
+
+export function createInputStore({ dir = null, connectionExists = () => true } = {}) {
+  const { load, save, file } = createListFile({ dir, name: 'inputs.json', connectionExists });
 
   return {
     list: (connectionId, tool) => load().filter((x) => x.connectionId === connectionId && (tool === undefined || x.tool === tool)),

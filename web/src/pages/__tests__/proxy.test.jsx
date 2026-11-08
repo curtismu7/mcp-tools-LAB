@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "../../App.jsx";
@@ -33,7 +33,7 @@ describe("Live proxy page", () => {
     expect(screen.getByText(/Mock: only the two built-in sample servers/)).toBeInTheDocument();
     await user.click(screen.getByTestId("proxy-toggle"));
     expect(sent("POST /api/proxy")[1].body).toEqual({ enabled: false });
-    expect(await screen.findByTestId("proxy-state")).toHaveTextContent("Off");
+    await waitFor(() => expect(screen.getByTestId("proxy-state")).toHaveTextContent("Off"));
   });
 
   it("lists flows and opens one; agent and server text is inert", async () => {

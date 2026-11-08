@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { get, post, pretty } from "../lib/api.js";
+import { del, get, post, pretty, put } from "../lib/api.js";
+import { buildBrief, downloadBrief } from "../lib/brief.js";
+import FlagControl from "../components/FlagControl.jsx";
 import { Untrusted, spansFor } from "../lib/Untrusted.jsx";
 import CallPanel from "../components/CallPanel.jsx";
 import ConfirmCall from "../components/ConfirmCall.jsx";
@@ -20,7 +22,7 @@ function fieldText(tool, field) {
   return typeof v === "string" ? v : null;
 }
 
-export default function Server({ conn, scan, onScanned, onMissing }) {
+export default function Server({ conn, scan, onScanned, onMissing, mockOnly = false }) {
   const [tab, setTab] = useState("tools");
   const [tools, setTools] = useState(scan?.listed.tools || null);
   const [others, setOthers] = useState(scan ? { resources: scan.listed.resources, prompts: scan.listed.prompts } : null);
@@ -33,6 +35,20 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
   const [methods, setMethods] = useState([]);
   const seen = useRef(new Map()); // name -> signature of the list last shown
   const base = `/api/connections/${encodeURIComponent(conn?.id || "")}`;
+  const [flags, setFlags] = useState([]);
+  const [flagErr, setFlagErr] = useState("");
+  const [briefNote, setBriefNote] = useState("");
+  const loadFlags = useCallback(async () => { const r = await get(`${base}/flags`); setFlags(r.ok ? r.data.flags || [] : []); }, [base]);
+  useEffect(() => { if (conn) loadFlags(); }, [conn?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flagOf = useCallback((kind, name) => flags.find((f) => f.kind === kind && f.name === name) || null, [flags]);
+  async function saveFlag(kind, name, note) {
+    setFlagErr("");
+    const r = await put(`${base}/flags`, { kind, name, note });
+    if (!r.ok) { setFlagErr(r.data?.message || `Could not save the flag (${r.status}).`); return false; }
+    loadFlags(); return true;
+  }
+  async function removeFlag(flag) { await del(`${base}/flags/${encodeURIComponent(flag.id)}`); loadFlags(); }
+  const flagProps = { onSave: saveFlag, onRemove: removeFlag, disabled: mockOnly };
 
   const remember = useCallback((list) => { seen.current = new Map((list || []).map((t) => [t.name, sigOf(t)])); }, []);
   // Compare a new list with the one last shown; a tool whose text changed is the rug-pull signal.
@@ -158,6 +174,7 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
                         <summary className="small">Input schema (shown as text)</summary>
                         <Untrusted block text={pretty(t.inputSchema ?? null)} />
                       </details>
+                      <FlagControl kind="tool" name={t.name} flag={flagOf("tool", t.name)} {...flagProps} />
                     </li>
                   );
                 })}
@@ -165,12 +182,28 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
             )}
           </>
         )}
-        {tab === "resources" && <Others items={others?.resources} kind="resource" idKey="uri" findings={findings} />}
-        {tab === "prompts" && <Others items={others?.prompts} kind="prompt" idKey="name" findings={findings} />}
+        {flagErr && <p className="alert" role="alert">{flagErr}</p>}
+        {tab === "resources" && <Others items={others?.resources} kind="resource" idKey="uri" findings={findings} flagOf={flagOf} flagProps={flagProps} />}
+        {tab === "prompts" && <Others items={others?.prompts} kind="prompt" idKey="name" findings={findings} flagOf={flagOf} flagProps={flagProps} />}
       </div>
 
       <h3>Scan result</h3>
       {report ? <ScanResult report={report} resolve={resolve} onDownload={() => downloadReport(report)} /> : <p className="muted">No scan yet. Press Scan to judge the metadata above.</p>}
+
+      <h3>Review brief</h3>
+      <div className="card" data-testid="brief">
+        <p className="small">Flag tools, resources or prompts above with a note, then download a Markdown brief for a coding agent or a reviewer: your notes, the server's definitions and the scan findings. Server text sits in fenced blocks marked as untrusted data, so the brief does not pass the poison on. {flags.length} flagged.</p>
+        <div className="controls">
+          <button type="button" className="btn" disabled={!flags.length} onClick={() => setBriefNote(`Downloaded ${downloadBrief(buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags }), conn.label)}.`)}>Download review brief (Markdown)</button>
+          {briefNote && <span className="small" role="status">{briefNote}</span>}
+        </div>
+        {flags.length > 0 && (
+          <details>
+            <summary className="small">Preview the brief</summary>
+            <Untrusted block text={buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags })} />
+          </details>
+        )}
+      </div>
 
       <h3>Call a tool</h3>
       <div className="card">
@@ -185,7 +218,7 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
   );
 }
 
-function Others({ items, kind, idKey, findings }) {
+function Others({ items, kind, idKey, findings, flagOf, flagProps }) {
   if (!items) return <p className="muted">Listing...</p>;
   if (items.length === 0) return <p className="muted">The server lists no {kind}s.</p>;
   return (
@@ -201,6 +234,7 @@ function Others({ items, kind, idKey, findings }) {
             {it.uri && it.name && <div className="small muted"><Untrusted text={it.uri} /></div>}
             <div className="small"><Untrusted text={it.description || ""} /></div>
             {Array.isArray(it.arguments) && it.arguments.length > 0 && <div className="small muted">Arguments: <Untrusted text={it.arguments.map((a) => a?.name).join(", ")} /></div>}
+            {typeof (it[idKey] ?? it.name) === "string" && <FlagControl kind={kind} name={it[idKey] ?? it.name} flag={flagOf(kind, it[idKey] ?? it.name)} {...flagProps} />}
           </li>
         );
       })}

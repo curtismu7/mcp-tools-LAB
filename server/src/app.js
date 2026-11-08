@@ -19,6 +19,7 @@ import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
 import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } from './mock.js';
 import { createPingone } from './pingone.js';
+import { createFlagStore, FlagError } from './flags.js';
 import { createInputStore, InputError } from './inputs.js';
 import { createProxy } from './proxy/router.js';
 import { clip, scrub, scrubJson } from './redact.js';
@@ -40,6 +41,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   const manager = createManager({ store, pingone: mock ? null : pingone, mock });
   // Saved inputs live next to the connections file (memory only when the store is virtual).
   const inputs = createInputStore({ dir: store.file ? path.dirname(store.file) : null, connectionExists: (id) => Boolean(store.get(id)) });
+  const flags = createFlagStore({ dir: store.file ? path.dirname(store.file) : null, connectionExists: (id) => Boolean(store.get(id)) });
   const maxScan = scanMaxBytes(env);
   const app = express();
   app.disable('x-powered-by');
@@ -138,6 +140,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   api.delete('/connections/:id', wrap(async (req, res) => {
     if (!(await manager.remove(req.params.id))) return bad(res, 'no such connection', 404);
     inputs.removeFor(req.params.id);
+    flags.removeFor(req.params.id);
     res.status(204).end();
   }));
 
@@ -147,6 +150,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   api.post('/reset', wrap(async (_req, res) => {
     liveProxy.reset(); // proxy off, its token gone, flow log cleared
     inputs.clear();
+    flags.clear();
     if (store.file === null) return res.json({ ok: true, cleared: 0, note: 'mock-only: nothing is stored' });
     const ids = store.list().map((c) => c.id);
     for (const id of ids) await manager.remove(id);
@@ -169,6 +173,24 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   api.delete('/connections/:id/inputs/:inputId', (req, res) => {
     const conn = connection(req, res); if (!conn) return;
     if (!inputs.remove(conn.id, req.params.inputId)) return bad(res, 'no such saved input', 404);
+    res.status(204).end();
+  });
+
+  // ---- flags: a note on a tool, resource or prompt, for the Markdown review brief (built in the page) ----
+  api.get('/connections/:id/flags', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    res.set('Cache-Control', 'no-store').json({ flags: flags.list(conn.id) });
+  });
+  api.put('/connections/:id/flags', small, (req, res) => {
+    if (mock) return res.status(403).json(MOCK_REFUSAL);
+    const conn = connection(req, res); if (!conn) return;
+    const body = isObject(req.body) ? req.body : {};
+    if (Object.keys(body).some((k) => !['kind', 'name', 'note'].includes(k))) return bad(res, 'accepted fields: kind, name, note');
+    try { res.json({ flag: flags.put(conn.id, body) }); } catch (err) { if (err instanceof FlagError) return bad(res, err.message); throw err; }
+  });
+  api.delete('/connections/:id/flags/:flagId', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    if (!flags.remove(conn.id, req.params.flagId)) return bad(res, 'no such flag', 404);
     res.status(204).end();
   });
 

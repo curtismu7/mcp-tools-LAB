@@ -16,6 +16,7 @@ Tier: Tester. Connect to an MCP server, list what it offers, scan the metadata f
 - No AI attribution anywhere (owner, 2026-11-07): no Co-Authored-By trailer and no "Generated with" line in commits, PR bodies or files; CI runs `scripts/check-no-ai-attribution.sh`.
 - Live proxy (`server/src/proxy/`): off by default, per-session proxy token, cross-site Origin refused, the client's Authorization never forwarded, neither token logged, Mock = fixtures only. It bypasses the confirm gate by design; keep the docs saying so.
 - Saved inputs (`server/src/inputs.js`) only fill the call form; never let one send a call without Review + confirm. Token counts are characters / 4 and must always be labelled as an estimate.
+- Review brief (`web/src/lib/brief.js`): server text and notes go only inside `fence()`; never interpolate them into headings or plain lines.
 
 ## Shelf
 `docs/shelf-entry.json` registers the app (D3 and D4, one app; tag `mcp-server-built`).

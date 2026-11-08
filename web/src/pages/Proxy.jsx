@@ -16,7 +16,7 @@ function Body({ body }) {
   return (
     <>
       <p className="muted small">{body.bytes} bytes, ~{body.tokens} tokens{body.sse ? ", server-sent events" : ""}{body.truncated ? `, first ${Math.round(text.length / 1024)} KB kept` : ""}</p>
-      <pre className="proxy__pre"><Untrusted text={text} block /></pre>
+      <div className="proxy__pre"><Untrusted text={text} block /></div>
     </>
   );
 }

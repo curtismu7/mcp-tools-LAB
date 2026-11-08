@@ -16,7 +16,7 @@ Press Scan on a connected server, read the findings with their evidence, and onl
 
 ## Status
 
-Built and tested. On a clean clone with nothing else checked out, `npm test` runs 177 server tests (175 always-on, all pass) and 101 web tests on Node 26, plus 2 optional server tests that are reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`, and the full-swagger check of the release-claim names, which needs `SWAGGER_FILE`); with a `hostile-mcp` checkout and the swagger file those run too. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
+Built and tested. On a clean clone with nothing else checked out, `npm test` runs 185 server tests (183 always-on, all pass) and 110 web tests on Node 26, plus 2 optional server tests that are reported as SKIPPED (the live hostile-server scan, which needs `HOSTILE_MCP_SRC`, and the full-swagger check of the release-claim names, which needs `SWAGGER_FILE`); with a `hostile-mcp` checkout and the swagger file those run too. `npm run build` passes. `npm run e2e` (not part of `npm test`, not CI) drives a real Chromium against a clean copy of the real hostile server and a benign fixture: banner, scan, findings with evidence, locked then confirm-gated call, offline scan with `[U+XXXX]` characters, diagram, no request outside the app origin, no console errors. Earlier one-off browser passes also covered both stories, presenter mode, light/dark and a 390px width; those are not in the e2e script.
 
 
 
@@ -55,6 +55,10 @@ The Live proxy page turns this tool into a local debugging passthrough, so you c
 
 - **Saved inputs:** on the Server page, after picking a tool, give the current arguments a name and press Save input; Load puts them back in the form. A `tools/call` captured by the live proxy can be saved the same way (Save as input in the flow detail, Real mode, saved connections only). Loading only fills the form: Review call and the confirm step still apply. They live in `inputs.json` next to `connections.json` (mode 600), at most 50 per connection, and go when the connection is deleted or on Reset. A mock-only copy refuses to save them.
 - **Token estimates:** each tool, resource and prompt shows `~N tokens`, the Tools tab shows what the whole `tools/list` costs an agent's context before it calls anything, and a call result shows its own cost. The proxy's flow log shows both directions. All are characters / 4: an estimate, not a tokenizer.
+
+### Flags and the review brief
+
+Flag any tool, resource or prompt on the Server page with a note, then press **Download review brief (Markdown)**: a `.md` file for a coding agent or a reviewer with your notes, the server's own definitions, the scan findings (flagged items first, the rest after) and the token cost. Every piece of server text, and every note, sits in a fenced block that no backtick run in the text can close, with invisible characters shown as `[U+XXXX]`, under a header that says it is untrusted data. The brief is built in the page from what this session listed and scanned. Flags are stored like saved inputs (`flags.json`, mode 600), one per item, and go with the connection and on Reset; a mock-only copy refuses them. A flag changes nothing on the server and blocks nothing.
 
 Checked by hand on 2026-11-07: the official MCP Inspector CLI (`@modelcontextprotocol/inspector` 2.14.0, `--cli --transport http --header`) listed tools and called a tool through the proxy, and was refused without the token.
 

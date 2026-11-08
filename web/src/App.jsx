@@ -79,7 +79,7 @@ function Shell() {
       {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
       <main className="page" id="main" tabIndex={-1}>
         {page === "connect" && <Connect config={config} activeId={active?.id} onOpen={open} onRemoved={clear} />}
-        {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} />}
+        {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} mockOnly={Boolean(config?.mockOnly)} />}
         {page === "proxy" && <Proxy modeSource={modeInfo?.source || "mock"} />}
         {page === "offline" && <Offline config={config} />}
         {page === "gateway" && <Gateway gw={gw} />}
