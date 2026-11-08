@@ -155,7 +155,11 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
     const out = {};
     for (const k of ['content-type', 'mcp-session-id', 'cache-control']) { const v = up.headers.get(k); if (v) out[k] = v; }
     res.status(up.status).set(out);
-    if (up.status === 401) flow.error = 'upstream refused the credential (401): sign in on the Server page (OAuth) or save the server with a token';
+    if (up.status === 401) {
+      flow.error = 'upstream refused the credential (401): sign in on the Server page (OAuth) or save the server with a token';
+      // The agent gets the 401 as it is; the Server page learns the server wants a token (no credential was sent, so a sign-in would help).
+      if (!signedIn && !conn.token) manager.noteRefusal?.(conn.id, { httpStatus: 401, wwwAuthenticate: (up.headers.get('www-authenticate') || '').slice(0, 2000) }).catch(() => {});
+    }
     flow.status = up.status; // visible while an SSE stream is still open
     flow.response = { headers: keptHeaders(up.headers), body: { bytes: 0, truncated: false, tokens: 0 } };
     // The client gets the upstream reply with every secret of this connection scrubbed out, streamed as it arrives.
@@ -290,7 +294,10 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
       if (!hit) return fail(-32602, `no tool ${name.slice(0, 120)}: names are <server>__<tool>`);
       Object.assign(flow, { route: hit.m.id, routeLabel: clip(`${ALL.label} → ${hit.m.label}`, 80) }); // so Save as input finds the server
       try { return ok(await clientFor(hit.target).rpc('tools/call', { ...(isObject(msg.params) ? msg.params : {}), name: name.slice(cut + 2) })); }
-      catch (err) { return fail(Number.isInteger(err.mcpCode) ? err.mcpCode : -32603, err.message); }
+      catch (err) {
+        if (err.httpStatus === 401 && hit.target.conn) manager.noteRefusal?.(hit.target.conn.id, err).catch(() => {});
+        return fail(Number.isInteger(err.mcpCode) ? err.mcpCode : -32603, err.message);
+      }
     }
     if (msg.method === 'resources/list' || msg.method === 'prompts/list') return ok(msg.method === 'resources/list' ? { resources: [] } : { prompts: [] });
     return fail(-32601, `${msg.method.slice(0, 80)} is not offered on the one-URL route; use the per-server URL`);

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 
 // A fake authorization server and a protected MCP server on loopback, shared by the OAuth tests. `opts` bends them:
-// lazy (only tools/call needs a token), challenge (the WWW-Authenticate value), resource (the resource the fake MCP server names), wrongIssuer, noRegistration, asOverride, iss/noIss/issParameter, authEndpoint, lax (codes reusable), expiresIn, echo (the MCP server
+// tokenScope (the scope text the token response carries), unauthStatus (the status for a missing token, default 401), lazy (only tools/call needs a token), needScope + scopeHeader (a 403 for missing scopes), challenge (the WWW-Authenticate value), resource (the resource the fake MCP server names), wrongIssuer, noRegistration, asOverride, iss/noIss/issParameter, authEndpoint, lax (codes reusable), expiresIn, echo (the MCP server
 // echoes the Bearer it got in tools/call).
 export const servers = [];
 export const listen = (handler) => new Promise((r) => { const s = http.createServer(handler); servers.push(s); s.listen(0, '127.0.0.1', () => r(`http://127.0.0.1:${s.address().port}`)); });
@@ -35,7 +35,7 @@ export async function world(opts = {}) {
         if (!a || b64url(crypto.createHash('sha256').update(p.code_verifier || '').digest()) !== a.code_challenge || p.redirect_uri !== a.redirect_uri || p.resource !== a.resource) return json(400, { error: 'invalid_grant' });
       } else if (p.grant_type !== 'refresh_token' || p.refresh_token !== 'refresh-secret-1') return json(400, { error: 'invalid_grant' });
       const t = `access-secret-${crypto.randomUUID()}`; st.tokens.add(t);
-      return json(200, { access_token: t, token_type: 'Bearer', expires_in: st.expiresIn, refresh_token: 'refresh-secret-1' });
+      return json(200, { access_token: t, token_type: 'Bearer', expires_in: st.expiresIn, refresh_token: 'refresh-secret-1', ...(opts.tokenScope ? { scope: opts.tokenScope } : {}) });
     }
     res.writeHead(404).end();
   });
@@ -47,8 +47,10 @@ export async function world(opts = {}) {
     st.mcpAuth.push(auth);
     const msg = JSON.parse(body || '{}');
     const open = (opts.lazy && msg.method !== 'tools/call') || st.open; // st.open: a test opens the whole server // lazy: only tools/call needs a token (like the Banking MCP server)
-    if (!open && !st.tokens.has(auth.replace(/^Bearer /, ''))) return res.writeHead(401, { 'www-authenticate': opts.challenge || `Bearer resource_metadata="${mcpUrl}/.well-known/oauth-protected-resource", scope="tools:read"` }).end();
+    if (!open && !st.tokens.has(auth.replace(/^Bearer /, ''))) return res.writeHead(opts.unauthStatus || 401, { 'www-authenticate': opts.challenge || `Bearer resource_metadata="${mcpUrl}/.well-known/oauth-protected-resource", scope="tools:read"` }).end();
     if (msg.id === undefined) return res.writeHead(202).end();
+    // needScope: a call with a valid token is refused 403 for lack of these scopes (JSON-RPC data like the Banking MCP server, or scopeHeader)
+    if (opts.needScope && msg.method === 'tools/call') return res.writeHead(403, { 'content-type': 'application/json', ...(opts.scopeHeader ? { 'www-authenticate': opts.scopeHeader } : {}) }).end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, error: { code: -32005, message: 'Insufficient scope', data: { requiredScopes: opts.needScope } } }));
     const result = msg.method === 'initialize' ? { protocolVersion: '2025-06-18', serverInfo: { name: 'protected', version: '1' }, capabilities: { tools: {} } } : msg.method === 'tools/list' ? { tools: [{ name: 'whoami', description: 'w', inputSchema: { type: 'object' } }] } : { content: [{ type: 'text', text: `echo ${auth}` }] };
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
   });
