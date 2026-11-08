@@ -33,7 +33,7 @@ async function callTool(user, name) {
 }
 
 describe("the release-claim banner", () => {
-  it("is on every tab, and says the app is the live inspector", async () => {
+  it("is on every tab, and says what Mock covers (the live proxy only)", async () => {
     const user = userEvent.setup();
     render(<App />);
     for (const name of PAGES) {
@@ -42,7 +42,7 @@ describe("the release-claim banner", () => {
       const b = screen.getByTestId("release-banner");
       expect(b).toHaveTextContent(BANNER);
       expect(b).toHaveTextContent(/simulated in Mock; in Real/);
-      await waitFor(() => expect(b).toHaveTextContent(/live inspector/));
+      await waitFor(() => expect(b).toHaveTextContent(/Mock: the live proxy offers only the two built-in sample servers/));
     }
   });
   it("is still there in presenter mode, on every tab", async () => {
@@ -55,6 +55,16 @@ describe("the release-claim banner", () => {
       expect(screen.getByTestId("release-banner")).toHaveTextContent(BANNER);
     }
     expect(screen.getByRole("toolbar", { name: "Presenter controls" })).toBeInTheDocument();
+  });
+  it("follows the header toggle: Real says the proxy offers your saved servers", async () => {
+    mockServer({ "POST /api/mode": (b) => ({ source: b.source, realAvailable: true, realReason: null }) });
+    routeGatewayTo(gatewayOrigin());
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId("release-banner")).toHaveTextContent(/Mock: the live proxy/));
+    await user.click(screen.getByTestId("mode-real"));
+    await waitFor(() => expect(screen.getByTestId("release-banner")).toHaveTextContent(/Real: the live proxy offers your saved servers/));
+    expect(screen.getByTestId("release-banner")).not.toHaveTextContent(/Mock:/);
   });
   it("names the hosted mock when the server runs mock-only", async () => {
     mockServer({ "GET /api/config": () => ({ scanMaxBytes: 1048576, stdio: false, mockOnly: true, pingone: { enabled: false } }) });

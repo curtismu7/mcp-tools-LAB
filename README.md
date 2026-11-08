@@ -49,12 +49,33 @@ The Live proxy page turns this tool into a local debugging passthrough, so you c
 - Mock mode offers the two built-in sample servers only, answered in this process. Real adds your saved servers: http servers are a raw passthrough (SSE streams included, redirects refused); stdio and PingOne connections are bridged through this tool's own client.
 - It is not a gateway and enforces no policy. **The confirm step of the Server page does not apply to calls an agent makes through the proxy.**
 - The log keeps the last 200 flows in memory only, bodies capped at 64 KB. Token counts are characters / 4, an estimate and not a tokenizer.
-- Not built: one aggregate URL for all servers, and running OAuth for the client (a server that needs an OAuth sign-in has to be saved with a token first).
+- **One URL for all servers:** `http://127.0.0.1:4810/proxy/mcp/` merges the tools of every route offered in this mode, named `<server>__<tool>`, and routes each call to its server. A server that cannot be reached is listed in the reply's `_meta`, never dropped silently. Tools only: resources and prompts stay on the per-server URLs.
+- **stdio servers stream:** a GET on a stdio route opens server-sent events with what the server sends on its own (progress, logs, list_changed, its requests to the client); the client's answers are written back to the server.
+- **A Mock/Real switch** empties the flow log and closes open streams; the proxy stays on.
+- **OAuth:** a server that asks for an OAuth token can be signed in to from the Server page (below); the proxy then uses that token upstream.
+
+### Sign in with our PingOne (pi.flow)
+
+A server whose authorization server is our PingOne environment (`PINGONE_ENVIRONMENT_ID` and `PINGONE_REGION` in `~/Development/.env`, client `PINGONE_MCP_CLIENT_ID`) signs in with the standard **Sign in** dialog: pi.flow, no redirect (rule 16). Only those three keys are read from the shared file. The token's audience is always the connection's own URL (a server that names another resource in its metadata is refused), and our PingOne is asked only for `openid` plus scopes listed in `MCPTOOLS_P1_SCOPES` (comma or space separated), whatever the server asks for. At most 5 sign-in starts a minute per connection; MFA and consent steps are not driven (the dialog names the step it stopped at).
+
+### OAuth sign-in (third-party servers)
+
+When a saved http server answers 401 with OAuth metadata, the Server page shows an **OAuth sign-in** card with the authorization server and scopes. **Sign in** registers this tool with that server (dynamic client registration, or a client id you type) and opens the sign-in in a new tab; the page picks it up when the tab lands back on `http://127.0.0.1:4810/api/oauth/callback`. PKCE S256, `resource`, a single-use state and the `iss` check apply. The token stays in this tool's memory only and is refreshed before it expires. This is a recorded exception to the family's pi.flow-only rule, for third-party servers only: Ping authorization servers are refused. See [docs/rule-16-waiver.md](docs/rule-16-waiver.md).
 
 ### Saved inputs and token estimates
 
-- **Saved inputs:** on the Server page, after picking a tool, give the current arguments a name and press Save input; Load puts them back in the form. A `tools/call` captured by the live proxy can be saved the same way (Save as input in the flow detail, Real mode, saved connections only). Loading only fills the form: Review call and the confirm step still apply. Calls (and so saved inputs) unlock after a scan of the server in this session; the call panel has its own Scan now button. Each tool card has a **Run** button that picks that tool in the call panel and scrolls to it; it sends nothing, and Review call and the confirm step still apply. They live in `inputs.json` next to `connections.json` (mode 600), at most 50 per connection, and go when the connection is deleted or on Reset. A mock-only copy refuses to save them.
+- **Saved inputs:** on the Server page, after picking a tool, give the current arguments a name and press Save input; Load puts them back in the form. A `tools/call` captured by the live proxy can be saved the same way (Save as input in the flow detail, Real mode, saved connections only). Loading only fills the form: Review call and the confirm step still apply. Calls (and so saved inputs) unlock after a scan of the server in this session; the call panel has its own Scan now button. Each tool card has a **Run** button that opens the call form inside that card, for that tool; Review call, the confirm step and the result all stay in the card. Run itself sends nothing. They live in `inputs.json` next to `connections.json` (mode 600), at most 50 per connection, and go when the connection is deleted or on Reset. A mock-only copy refuses to save them.
 - **Token estimates:** each tool, resource and prompt shows `~N tokens`, the Tools tab shows what the whole `tools/list` costs an agent's context before it calls anything, and a call result shows its own cost. The proxy's flow log shows both directions. All are characters / 4: an estimate, not a tokenizer.
+
+### The call form fills things in for you
+
+Most people will not know an account id or a user id, so the call form fills in what it can, marks each filled field ("filled in for you: demo value / signed-in user / from the server's schema / picked from the server") and leaves every field editable. Nothing is sent by filling.
+
+- **Signed-in user:** `user_id`, `email` and `username` fields take the claims of the signed-in identity (pi.flow or OAuth), never the token.
+- **Demo values** for our own servers (`server/data/sample-values.json`: city, symbol and similar plain text; never ids or secrets).
+- **Pick:** for an id field such as `account_id`, **Pick account_id from the server** finds the server's own read-only list tool (for example `get_my_accounts`), shows the exact call and asks you once, then offers the real ids to choose from. Not offered when the scan flagged the list tool.
+- **Schema values:** a *required* field takes the schema's own default, example or first enum value, only when it is plain words (letters, digits, spaces and a few word marks; never anything that can be a host, address, scheme, path, email, markup or template, and no invisible or lookalike characters) and never on a tool the scan flagged. Nothing at all is filled, from any source, on a flagged tool, or while the last scan no longer covers the tool list (after a rug-pull) or before a scan. This relaxes the old rule that a schema default is never filled; the owner asked for it (2026-11-07).
+- **Pick** only uses a tool with no required arguments that the server does not mark as destructive or not read-only; the dialog says whether the server marks it read-only. An id with an invisible or bidi character is never offered.
 
 ### Flags and the review brief
 

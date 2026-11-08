@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { del, get, post, pretty } from "../lib/api.js";
 import { estimateTokens, TOKEN_NOTE } from "../lib/tokens.js";
+import { choicesFrom, listToolFor, sourceLabel, suggestValues } from "../lib/suggest.js";
 import { Untrusted } from "../lib/Untrusted.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import SchemaForm, { buildArgs, fieldsOf, valuesFrom } from "./SchemaForm.jsx";
@@ -9,8 +10,11 @@ import { SEV } from "./ScanResult.jsx";
 // Pick a tool, fill the form, Review call -> the server returns the canonical arguments and their hash -> the dialog shows
 // exactly that text -> only the Send click posts {confirm:true, argsHash}. Changing the tool or any value drops the preview.
 // `pick` ({name, at}) comes from a Run button on a tool card: it selects that tool here. It never sends anything.
-export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick }) {
-  const [name, setName] = useState("");
+// `fixedTool`: the panel is for that one tool (a Run button on its card); the tool picker is hidden.
+// `covered`: the last scan still covers the tool list shown (false after a rug-pull until the next scan): filling in and Pick
+// are held back until it does.
+export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick, fixedTool, covered = true }) {
+  const [name, setName] = useState(fixedTool || "");
   const [values, setValues] = useState({});
   const [raw, setRaw] = useState("{}");
   const [review, setReview] = useState(null); // {canonical, argsHash, args}
@@ -20,6 +24,11 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
   const [saved, setSaved] = useState([]); // saved inputs for this tool
   const [saveName, setSaveName] = useState("");
   const [savedNote, setSavedNote] = useState("");
+  const [from, setFrom] = useState({}); // field -> where a filled-in value came from; cleared when the person edits it
+  const [fillNote, setFillNote] = useState("");
+  const [lookup, setLookup] = useState(null); // {field, tool, review: {canonical, argsHash}} while Pick waits for its confirm
+  const [choices, setChoices] = useState({}); // list tool -> [{id, label}], asked once per tool per panel
+  const [choosing, setChoosing] = useState(null); // field whose choices are showing
   const resultRef = useRef(null);
   const tool = (tools || []).find((t) => t.name === name);
   const fields = useMemo(() => fieldsOf(tool?.inputSchema), [tool]);
@@ -38,6 +47,24 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
     setSaved(r.ok ? (r.data.inputs || []).filter((x) => x.tool === name) : []);
   }, [base, name]);
   useEffect(() => { setSaved([]); if (scanned) loadSaved(); }, [loadSaved, scanned]);
+
+  // Fill in what a person would not know (signed-in identity, our demo values, safe schema values), only into empty
+  // fields, each marked with where it came from. Nothing is sent: the form is just pre-filled.
+  useEffect(() => {
+    setFrom({}); setFillNote(""); setChoosing(null); setLookup(null);
+    if (!scanned || !covered || !tool || !fields?.length) return undefined;
+    let live = true;
+    get(`${base}/fill`).then((r) => {
+      if (!live) return;
+      const { values: v, from: f } = suggestValues(fields, { fill: r.ok ? r.data : {}, flagged: Boolean(flaggedBy(tool.name)) });
+      if (!Object.keys(v).length) return;
+      setValues((prev) => ({ ...v, ...Object.fromEntries(Object.entries(prev).filter(([, x]) => x !== undefined && x !== "")) }));
+      setFrom((prev) => ({ ...f, ...prev }));
+      setFillNote(`Filled in ${Object.keys(v).length} field${Object.keys(v).length === 1 ? "" : "s"} for you. Each says where its value came from; change any of them.`);
+    });
+    return () => { live = false; };
+  }, [name, connectionId, scanned, covered]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setChoices({}); }, [connectionId]); // ids looked up on one server are not offered for another
 
   if (!scanned) return (
     <div data-testid="call-locked">
@@ -61,7 +88,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
     return args;
   }
   function loadInput(input) {
-    setReview(null); setResult(null); setError(null);
+    setReview(null); setResult(null); setError(null); setFrom({}); setFillNote(""); setChoosing(null);
     if (fields) {
       const { values: v, extra } = valuesFrom(fields, input.arguments || {});
       setValues(v);
@@ -76,6 +103,44 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
     setSaveName(""); setSavedNote(`Saved "${r.data.input.name}".`); loadSaved();
   }
   async function removeSaved(input) { await del(`${base}/inputs/${encodeURIComponent(input.id)}`); loadSaved(); }
+
+  // ---- Pick: ask the server's own read-only list tool for the ids, behind the normal Review + confirm. ----
+  const idChoices = (field) => { if (!covered) return null; const lt = listToolFor(field, tools); return lt && !flaggedBy(lt) ? lt : null; };
+  async function startPick(field, listTool) {
+    setError(null);
+    if (choices[listTool]) { setChoosing(field); return; } // already asked this session: no second call
+    const r = await post(`${base}/call/preview`, { tool: listTool, arguments: {} });
+    if (!r.ok) { setError(r.data?.message || "Could not prepare the lookup."); return; }
+    setLookup({ field, tool: listTool, review: r.data });
+  }
+  async function sendPick() {
+    const { field, tool: lt, review: rv } = lookup;
+    setBusy(true);
+    const r = await post(`${base}/call`, { tool: lt, arguments: {}, confirm: true, argsHash: rv.argsHash });
+    setBusy(false); setLookup(null);
+    if (!r.ok) { setError(r.data?.message || `The lookup failed (${r.status}).`); return; }
+    setChoices((c) => ({ ...c, [lt]: choicesFrom(r.data.result) }));
+    setChoosing(field);
+  }
+  function choose(field, c) {
+    setValues((p) => ({ ...p, [field]: c.id })); setFrom((p) => ({ ...p, [field]: "lookup" })); setChoosing(null); setReview(null);
+  }
+  function pickFor(field) {
+    const lt = idChoices(field);
+    if (!lt) return null;
+    const list = choices[lt];
+    return (
+      <div className="pick-row">
+        <button type="button" className="btn" onClick={() => startPick(field, lt)} data-testid={`pick-${field}`}>Pick {field} from the server</button>
+        <span className="small muted">asks {lt}, {(tools || []).find((t) => t.name === lt)?.annotations?.readOnlyHint === true ? "which the server marks read-only" : "a tool named like a list (the server does not mark it read-only: check it)"}, once</span>
+        {choosing === field && (list?.length ? (
+          <ul className="pick-choices" data-testid="pick-choices">
+            {list.map((c) => <li key={c.id}><button type="button" className="btn" onClick={() => choose(field, c)}><Untrusted text={c.label || c.id} /> <span className="muted small"><Untrusted text={c.id} /></span></button></li>)}
+          </ul>
+        ) : <p className="small muted">{lt} returned no ids. Type one in.</p>)}
+      </div>
+    );
+  }
 
   async function doReview() {
     setError(null); setResult(null);
@@ -96,14 +161,16 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
 
   return (
     <div>
-      <div className="fields">
-        <label>Tool
-          <select value={name} onChange={(e) => setName(e.target.value)}>
-            <option value="">Choose a tool</option>
-            {(tools || []).map((t, i) => <option key={`${t.name}-${i}`} value={t.name}>{t.name}</option>)}
-          </select>
-        </label>
-      </div>
+      {!fixedTool && (
+        <div className="fields">
+          <label>Tool
+            <select value={name} onChange={(e) => setName(e.target.value)}>
+              <option value="">Choose a tool</option>
+              {(tools || []).map((t, i) => <option key={`${t.name}-${i}`} value={t.name}>{t.name}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
       {tool && (
         <>
           {flagged && <p className="alert" role="alert">The scan flagged this tool ({SEV[flagged]}). Read its findings first. Calling it is your decision; nothing was blocked.</p>}
@@ -122,7 +189,9 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
             </div>
           )}
           {savedNote && <p className="small" role="status" data-testid="saved-note"><Untrusted text={savedNote} /></p>}
-          <SchemaForm schema={tool.inputSchema} values={values} onChange={(k, v) => { setValues((p) => ({ ...p, [k]: v })); setReview(null); }} rawText={raw} onRawText={(t) => { setRaw(t); setReview(null); }} />
+          {fillNote && <p className="small muted" role="status" data-testid="fill-note">{fillNote}</p>}
+          <SchemaForm schema={tool.inputSchema} values={values} from={from} extra={pickFor}
+            onChange={(k, v) => { setValues((p) => ({ ...p, [k]: v })); setFrom((p) => { const { [k]: _gone, ...rest } = p; return rest; }); setReview(null); }} rawText={raw} onRawText={(t) => { setRaw(t); setReview(null); }} />
           <button type="button" className="btn primary" onClick={doReview} disabled={busy}>Review call</button>
           <div className="controls">
             <label className="small">Save these arguments as <input value={saveName} onChange={(e) => setSaveName(e.target.value)} maxLength={80} placeholder="a name" /></label>
@@ -131,10 +200,17 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
         </>
       )}
       {error && <p className="alert" role="alert">{error}</p>}
+      {lookup && (
+        <ConfirmDialog title="Look up the choices?" confirmLabel="Send lookup" onConfirm={sendPick} onCancel={() => setLookup(null)} busy={busy}>
+          <p>To offer you real values for <code><Untrusted text={lookup.field} /></code>, this will call <code><Untrusted text={lookup.tool} /></code>, a tool of this server named like a list ({(tools || []).find((t) => t.name === lookup.tool)?.annotations?.readOnlyHint === true ? "the server marks it read-only" : "the server does not mark it read-only"}), with no arguments. Nothing has been sent yet.</p>
+          <div data-testid="lookup-canonical"><Untrusted block text={lookup.review.canonical} /></div>
+          <p className="small muted">Hash <code>{lookup.review.argsHash.slice(0, 16)}</code>. The tool server refuses the call if what is sent differs from this.</p>
+        </ConfirmDialog>
+      )}
       {review && (
         <ConfirmDialog title="Send this call?" confirmLabel="Send call" onConfirm={send} onCancel={() => setReview(null)} busy={busy}>
           <p>This is exactly what will be sent to the server. Nothing has been sent yet.</p>
-          <pre className="untrusted untrusted--block" data-testid="canonical">{review.canonical}</pre>
+          <div data-testid="canonical"><Untrusted block text={review.canonical} /></div>
           <p className="small muted">Hash <code data-testid="hash">{review.argsHash.slice(0, 16)}</code>. The tool server refuses the call if what is sent differs from this.</p>
           {flagged && <p className="alert">The scan flagged this tool ({SEV[flagged]}).</p>}
         </ConfirmDialog>

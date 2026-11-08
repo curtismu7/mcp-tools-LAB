@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { del, get, post, pretty, put } from "../lib/api.js";
 import { buildBrief, downloadBrief } from "../lib/brief.js";
 import FlagControl from "../components/FlagControl.jsx";
+import OAuthPanel from "../components/OAuthPanel.jsx";
+import PingOnePanel from "../components/PingOnePanel.jsx";
 import { Untrusted, spansFor } from "../lib/Untrusted.jsx";
 import CallPanel from "../components/CallPanel.jsx";
 import ConfirmCall from "../components/ConfirmCall.jsx";
@@ -49,9 +51,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
   }
   async function removeFlag(flag) { await del(`${base}/flags/${encodeURIComponent(flag.id)}`); loadFlags(); }
   const flagProps = { onSave: saveFlag, onRemove: removeFlag, disabled: mockOnly };
-  const [pick, setPick] = useState(null); // a Run button's tool, handed to the call panel
-  const callRef = useRef(null);
-  const run = (name) => { setPick({ name, at: Date.now() }); callRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); };
+  const [running, setRunning] = useState(null); // the tool whose card has its call panel open (Run), one at a time
 
   const remember = useCallback((list) => { seen.current = new Map((list || []).map((t) => [t.name, sigOf(t)])); }, []);
   // Compare a new list with the one last shown; a tool whose text changed is the rug-pull signal.
@@ -126,6 +126,8 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
     <>
       <h2>Server: <Untrusted text={conn.label} /></h2>
       <p className="lede">{conn.transport === "http" ? <Untrusted text={conn.url} /> : conn.transport}{conn.token === "set" ? " · token set" : ""}</p>
+      {conn.transport === "pingone" && !mockOnly && <PingOnePanel onSignedIn={() => { setTools(null); list(); }} />}
+      {conn.transport === "http" && !mockOnly && <OAuthPanel conn={conn} onSignedIn={() => { setTools(null); list(); }} />}
       {!scan && <p className="notice" data-testid="scan-banner"><strong>Scan before first use.</strong> This connection has not been scanned. What is listed below is what an agent would be given as trusted context. Press Scan before you call anything.</p>}
       {(changed.length > 0 || scanCover === "older") && (
         <p className="alert" role="alert" data-testid="changed">
@@ -178,8 +180,14 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
                         <Untrusted block text={pretty(t.inputSchema ?? null)} />
                       </details>
                       <div className="flag-row">
-                        <button type="button" className="btn" onClick={() => run(t.name)} aria-label={`Run ${t.name}`}>Run</button>
+                        <button type="button" className={running === t.name ? "btn" : "btn primary"} aria-expanded={running === t.name} aria-label={`${running === t.name ? "Close" : "Run"} ${t.name}`}
+                          onClick={() => setRunning((r) => (r === t.name ? null : t.name))}>{running === t.name ? "Close" : "Run"}</button>
                       </div>
+                      {running === t.name && (
+                        <div className="inline-run" data-testid="inline-run">
+                          <CallPanel key={t.name} connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} fixedTool={t.name} />
+                        </div>
+                      )}
                       <FlagControl kind="tool" name={t.name} flag={flagOf("tool", t.name)} {...flagProps} />
                     </li>
                   );
@@ -211,9 +219,9 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
         )}
       </div>
 
-      <h3 ref={callRef} tabIndex={-1}>Call a tool</h3>
+      <h3>Call a tool</h3>
       <div className="card">
-        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} pick={pick} />
+        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} covered={scanCover === "current"} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} />
       </div>
 
       <details className="card" data-admin-only>

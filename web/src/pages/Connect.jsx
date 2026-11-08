@@ -119,7 +119,7 @@ function ConnectForm({ config, onCreated, onGo }) {
             <p className="small muted">The command gets a minimal environment (PATH, HOME, and what you list here). It lives in memory for this session only.</p>
           </>
         )}
-        {f.transport === "pingone" && <p className="small muted">Optional, untested here. Sign in with the PingOne controls in the README first.</p>}
+        {f.transport === "pingone" && <p className="small muted">Optional, untested here. After connecting, sign in on the Server page (pi.flow: the Sign in dialog, no redirect).</p>}
       </div>
       <button type="submit" className="btn primary" disabled={busy}>{busy ? "Connecting..." : "Connect and test"}</button>
       {msg && <p className={msg.ok ? "ok" : "alert"} role="status">{msg.text}</p>}

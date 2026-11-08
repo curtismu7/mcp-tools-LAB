@@ -147,7 +147,7 @@ test('an upstream that echoes the credential back: scrubbed for the client and i
     assert.ok(!r.text.includes('upstream-secret-value-123'), 'the client does not get the saved credential back either (rule 4)');
     assert.match(r.text, /\[redacted\]/);
     const f = (await app.call('GET', '/api/proxy/flows')).json.flows.at(-1);
-    assert.match(f.error, /refused the saved credential/);
+    assert.match(f.error, /refused the credential/);
     const d = (await app.call('GET', `/api/proxy/flows/${f.id}`)).text;
     assert.ok(!d.includes('upstream-secret-value-123'));
     assert.match(d, /\[redacted\]/);

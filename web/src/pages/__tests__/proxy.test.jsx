@@ -10,7 +10,7 @@ beforeEach(() => { window.location.hash = "proxy"; });
 afterEach(cleanup);
 
 const OFF = { enabled: false, token: null, routes: [], tokenMethod: "estimate: characters / 4", maxFlows: 200 };
-const ON = { ...OFF, enabled: true, token: "tok_abc", routes: [{ id: "mock-sample", label: "Sample server (clean)", transport: "mock", path: "/proxy/mcp/mock-sample" }] };
+const ON = { ...OFF, enabled: true, token: "tok_abc", all: { id: "*", label: "All servers (one URL)", transport: "aggregate", path: "/proxy/mcp/" }, routes: [{ id: "mock-sample", label: "Sample server (clean)", transport: "mock", path: "/proxy/mcp/mock-sample" }] };
 const FLOW = { id: 7, at: "2026-01-01T00:00:00.000Z", route: "mock-sample", routeLabel: "<b>Sample</b>", via: "bridge", httpMethod: "POST", rpcMethod: "tools/call", status: 200, ms: 3, open: false, requestTokens: 12, responseTokens: 30 };
 const DETAIL = { ...FLOW, request: { headers: { "content-type": "application/json", authorization: "[proxy token, not forwarded]" }, body: { bytes: 40, tokens: 12, json: { method: "tools/call", params: { name: "<img src=x onerror=alert(1)>" } } } }, response: { headers: {}, body: { bytes: 90, tokens: 30, json: { result: { content: [{ type: "text", text: "<script>x</script>" }] } } } } };
 
@@ -31,6 +31,8 @@ describe("Live proxy page", () => {
     expect(await screen.findByTestId("proxy-token")).toHaveTextContent("tok_abc");
     expect(within(screen.getByTestId("proxy-routes")).getByText(/claude mcp add --transport http sample-server-clean-via-proxy http:\/\/.*\/proxy\/mcp\/mock-sample --header "Authorization: Bearer tok_abc"/)).toBeInTheDocument();
     expect(screen.getByText(/Mock: only the two built-in sample servers/)).toBeInTheDocument();
+    expect(within(screen.getByTestId("proxy-routes")).getByText(/claude mcp add --transport http all-servers-one-url-via-proxy http:\/\/.*\/proxy\/mcp\/ --header/)).toBeInTheDocument();
+    expect(screen.getByText(/tools named <server>__<tool>/)).toBeInTheDocument();
     await user.click(screen.getByTestId("proxy-toggle"));
     expect(sent("POST /api/proxy")[1].body).toEqual({ enabled: false });
     await waitFor(() => expect(screen.getByTestId("proxy-state")).toHaveTextContent("Off"));

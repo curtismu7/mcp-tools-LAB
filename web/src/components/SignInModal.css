@@ -1,0 +1,6 @@
+.signin-dialog { position: fixed; top: 6rem; right: 1.5rem; z-index: 50; width: min(22rem, calc(100vw - 2rem)); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px var(--shadow-ink); padding: 1rem; }
+.signin-title { margin: 0 0 0.5rem; cursor: move; user-select: none; font-size: 1.1rem; }
+.signin-dialog form { display: grid; gap: 0.35rem; }
+.signin-dialog input { width: 100%; }
+.signin-error { color: var(--danger-text); margin: 0.25rem 0; }
+.signin-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem; }
