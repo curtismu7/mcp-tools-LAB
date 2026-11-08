@@ -13,6 +13,9 @@
 //  - the client's Authorization header is never forwarded upstream; the upstream credential is the saved connection's
 //    own (write-only, as everywhere in this tool). Neither is stored in the flow log (see flows.js), and an upstream
 //    that echoes the saved credential has it scrubbed from what the client receives too (rule 4).
+//  - One URL for all: /proxy/mcp/ merges the tools of every route offered in this mode, named <alias>__<tool>, and
+//    routes a call to the right server (tools only; resources and prompts stay on the per-server URLs). A server that
+//    cannot be reached is reported in the listing's _meta, never silently dropped.
 //  - Mock mode (rule 19) offers the two built-in fixtures only, answered in this process; saved connections need Real.
 //  - http targets: raw passthrough (bytes streamed, SSE included), redirects refused. stdio / PingOne / fixtures:
 //    bridged (JSON-RPC answered through this tool's own client for that connection). A stdio route also streams: a GET
@@ -54,6 +57,18 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
     if (realAllowed()) for (const c of store.list()) if (!FIXTURE_IDS.includes(c.id)) out.push({ id: c.id, label: c.label, transport: c.transport });
     return out.map((r) => ({ id: r.id, label: r.label, transport: r.transport, path: `/proxy/mcp/${encodeURIComponent(r.id)}` }));
   }
+  // Aliases for the one-URL route: a slug of the label, made unique in order (sample, sample-2, ...).
+  function members() {
+    const used = new Set();
+    return routes().map((r) => {
+      const base = String(r.label || r.id).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'server';
+      let alias = base; let n = 2;
+      while (used.has(alias)) alias = `${base}-${n++}`;
+      used.add(alias);
+      return { ...r, alias };
+    });
+  }
+  const ALL = { id: '*', label: 'All servers (one URL)', transport: 'aggregate', path: '/proxy/mcp/' };
   // -> {kind:'fixture'|'conn', ...} or {status, error, message}
   function resolve(id) {
     if (FIXTURE_IDS.includes(id)) return { kind: 'fixture', route: fixtureRoute(id) };
@@ -77,6 +92,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
     return next();
   });
   proxy.all('/mcp/:id', express.raw({ type: () => true, limit: '4mb' }), (req, res, next) => handle(req, res).catch(next));
+  proxy.all('/mcp', express.raw({ type: () => true, limit: '4mb' }), (req, res, next) => aggregate(req, res).catch(next));
   async function handle(req, res) {
     const target = resolve(req.params.id);
     if (target.status) return res.status(target.status).json({ error: target.error, message: target.message });
@@ -205,6 +221,65 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
     }
   }
 
+  // One URL for all servers: JSON-RPC answered here, tools fanned out to every member through this tool's own clients.
+  async function aggregate(req, res) {
+    const list = members();
+    const targets = list.map((m) => ({ m, target: resolve(m.id) })).filter((x) => !x.target.status);
+    const secrets = [state.token, ...targets.flatMap((x) => (x.target.conn ? secretsFor(x.target.conn) : []))];
+    const reqText = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
+    const reqBody = captureBody(reqText, { secrets, contentType: req.headers['content-type'] });
+    const flow = flows.add({
+      at: new Date().toISOString(), route: ALL.id, routeLabel: ALL.label, transport: 'aggregate', via: 'aggregate',
+      httpMethod: req.method, ...rpcSummary(reqBody.json), status: null, ms: null, open: true,
+      request: { headers: keptHeaders(req.headers, { authLabel: '[proxy token, not forwarded]' }), body: reqBody }, response: null, error: null,
+    });
+    const started = Date.now();
+    const done = (status, response, error = null) => Object.assign(flow, { status, ms: Date.now() - started, open: false, response, error: error && clip(scrub(error, secrets)) });
+    const reply = (status, payload) => {
+      const text = JSON.stringify(scrubJson(payload, secrets));
+      res.status(status).type('application/json').send(text);
+      done(status, { headers: { 'content-type': 'application/json' }, body: captureBody(text, { secrets, contentType: 'application/json' }) });
+    };
+    if (req.method === 'DELETE') { res.status(204).end(); return done(204, null); }
+    if (req.method !== 'POST') { res.status(405).set('Allow', 'POST, DELETE').json({ error: 'method_not_allowed', message: 'The one-URL route answers POST JSON-RPC only.' }); return done(405, null); }
+    let msg = null;
+    try { msg = JSON.parse(reqText); } catch { msg = null; }
+    if (!isObject(msg) || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return reply(400, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'one JSON-RPC 2.0 message per POST' } });
+    if (msg.id === undefined) { res.status(202).end(); return done(202, null); }
+    const ok = (result) => reply(200, { jsonrpc: '2.0', id: msg.id, result });
+    const fail = (code, message) => reply(200, { jsonrpc: '2.0', id: msg.id, error: { code, message: clip(scrub(message, secrets)) } });
+    if (msg.method === 'initialize') return ok({ protocolVersion: msg.params?.protocolVersion || '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'mcp-tools-all-servers', version: '1' }, instructions: `Tools of ${targets.length} server(s), named <server>__<tool>.` });
+    if (msg.method === 'ping') return ok({});
+    if (msg.method === 'tools/list') {
+      const tools = []; const unreachable = [];
+      await Promise.all(targets.map(async ({ m, target }) => {
+        try {
+          let cursor; let pages = 0; const got = [];
+          do {
+            const r = await clientFor(target).rpc('tools/list', cursor ? { cursor } : {});
+            got.push(...(Array.isArray(r?.tools) ? r.tools : []));
+            cursor = typeof r?.nextCursor === 'string' ? r.nextCursor : undefined;
+          } while (cursor && ++pages < 20);
+          for (const t of got) if (t && typeof t.name === 'string') tools.push({ ...t, name: `${m.alias}__${t.name}` });
+        } catch (err) { unreachable.push({ server: m.alias, label: m.label, error: clip(err.message, 200) }); }
+      }));
+      tools.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      if (unreachable.length) flow.error = `unreachable: ${unreachable.map((u) => u.server).join(', ')}`;
+      return ok({ tools, ...(unreachable.length ? { _meta: { 'mcp-tools/unreachable': unreachable } } : {}) });
+    }
+    if (msg.method === 'tools/call') {
+      const name = String(msg.params?.name ?? '');
+      const cut = name.indexOf('__');
+      const hit = cut > 0 ? targets.find((x) => x.m.alias === name.slice(0, cut)) : null;
+      if (!hit) return fail(-32602, `no tool ${name.slice(0, 120)}: names are <server>__<tool>`);
+      Object.assign(flow, { route: hit.m.id, routeLabel: clip(`${ALL.label} → ${hit.m.label}`, 80) }); // so Save as input finds the server
+      try { return ok(await clientFor(hit.target).rpc('tools/call', { ...(isObject(msg.params) ? msg.params : {}), name: name.slice(cut + 2) })); }
+      catch (err) { return fail(Number.isInteger(err.mcpCode) ? err.mcpCode : -32603, err.message); }
+    }
+    if (msg.method === 'resources/list' || msg.method === 'prompts/list') return ok(msg.method === 'resources/list' ? { resources: [] } : { prompts: [] });
+    return fail(-32601, `${msg.method.slice(0, 80)} is not offered on the one-URL route; use the per-server URL`);
+  }
+
   // The stdio stream: one SSE event per message the server sends on its own, each also logged as its own flow.
   async function stream({ req, res, target, client, secrets, done }) {
     await client.ensure();
@@ -231,7 +306,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
 
   // ---- the control API (mounted inside /api: same-origin writes apply) ---------------------------------------
   const api = express.Router();
-  const view = () => ({ enabled: state.enabled, token: state.token, routes: routes(), tokenMethod: TOKEN_METHOD, maxFlows: MAX_FLOWS, maxBody: MAX_BODY });
+  const view = () => ({ enabled: state.enabled, token: state.token, all: ALL, routes: routes(), tokenMethod: TOKEN_METHOD, maxFlows: MAX_FLOWS, maxBody: MAX_BODY });
   api.get('/', (_req, res) => res.set('Cache-Control', 'no-store').json(view()));
   api.post('/', express.json({ limit: '4kb' }), (req, res) => {
     const body = req.body ?? {};

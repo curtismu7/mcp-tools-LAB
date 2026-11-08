@@ -45,7 +45,7 @@ export default function Proxy({ modeSource }) {
   async function show(id) { setSaveNote(""); const r = await get(`/api/proxy/flows/${id}`); if (r.ok) setOpen(r.data.flow); else setErr(r.data?.message || "That flow is gone."); }
   // A captured tools/call can become a saved input of that connection (fixtures are not saved connections).
   const callOf = (f) => { const j = f?.request?.body?.json; return f?.rpcMethod === "tools/call" && !f.request.body.truncated && j?.params && typeof j.params.name === "string" ? j.params : null; };
-  const savable = (f) => info?.routes?.some((r) => r.id === f.route && r.transport !== "mock");
+  const savable = (f) => info?.routes?.some((r) => r.id === f.route && r.transport !== "mock" && r.transport !== "aggregate");
   const [saveNote, setSaveNote] = useState("");
   async function saveFlow(f) {
     const p = callOf(f);
@@ -72,11 +72,11 @@ export default function Proxy({ modeSource }) {
           <>
             <p className="small">Proxy token for this session: <code data-testid="proxy-token">{info.token}</code>. Clients send it as <code>Authorization: Bearer ...</code>. It is a local key made by this tool, not a server credential; turning the proxy off, Reset or a restart ends it. The server's own credential stays in the saved connection and is never shown or logged.</p>
             <ul className="proxy__routes" data-testid="proxy-routes">
-              {info.routes.map((r) => {
+              {[...(info.all ? [info.all] : []), ...info.routes].map((r) => {
                 const cmd = clientCommand(origin, r, info.token);
                 return (
                   <li key={r.id}>
-                    <strong><Untrusted text={r.label} /></strong> <span className="muted small">{r.transport === "http" ? "passthrough" : "bridged"}</span>
+                    <strong><Untrusted text={r.label} /></strong> <span className="muted small">{r.transport === "aggregate" ? "every server below, tools named <server>__<tool>" : r.transport === "http" ? "passthrough" : r.transport === "stdio" ? "bridged, with a stream" : "bridged"}</span>
                     <pre className="proxy__pre proxy__cmd">{cmd}</pre>
                     <button type="button" className="btn" onClick={() => copy(cmd, r.id)}>{copied === r.id ? "Copied" : "Copy the Claude Code command"}</button>
                   </li>

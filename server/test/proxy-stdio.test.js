@@ -35,7 +35,7 @@ test('stdio: GET opens a stream with the server\'s own messages; the client answ
     const id = c.json.connection.id;
     await app.call('POST', '/api/mode', { source: 'real' });
     const { token } = (await app.call('POST', '/api/proxy', { enabled: true })).json;
-    const h = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    const h = { Connection: 'close', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
     const url = `${app.origin}/proxy/mcp/${id}`;
     const send = (body) => fetch(url, { method: 'POST', headers: h, body: JSON.stringify(body) });
     assert.equal((await send(INIT)).status, 200);
