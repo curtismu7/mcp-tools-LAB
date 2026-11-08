@@ -102,7 +102,7 @@ async function getJson(url, { method = 'GET', body, headers = {} } = {}) {
 // WWW-Authenticate: Bearer resource_metadata="...", scope="..."
 export function parseChallenge(header) {
   const out = {};
-  for (const m of String(header || '').matchAll(/([a-zA-Z_]+)="([^"]*)"/g)) out[m[1].toLowerCase()] = m[2];
+  for (const m of String(header || '').matchAll(/([a-zA-Z_]+)=(?:"([^"]*)"|([^\s,"]+))/g)) out[m[1].toLowerCase()] = m[2] ?? m[3]; // quoted or a bare token (error=insufficient_scope)
   return out;
 }
 
