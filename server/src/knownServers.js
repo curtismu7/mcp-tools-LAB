@@ -8,7 +8,7 @@ const FILE = fileURLToPath(new URL('../data/known-servers.json', import.meta.url
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const ID = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const MAX_SERVERS = 20;
-const FIELDS = new Set(['id', 'label', 'transport', 'url', 'authHeader', 'note', 'start']);
+const FIELDS = new Set(['id', 'label', 'transport', 'url', 'authHeader', 'note', 'start', 'needsToken']);
 const text = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
 
 // Throws on anything that is not a plain loopback http server entry: a wrong address must fail loudly, not be probed.
@@ -25,7 +25,8 @@ export function validateKnownServers(doc) {
     let u;
     try { u = new URL(s.url); } catch { throw new Error(`known-servers: ${s.id}: url is not a URL`); }
     if (u.protocol !== 'http:' || !LOOPBACK.has(u.hostname) || u.username || u.password || !u.port) throw new Error(`known-servers: ${s.id}: url must be http on a loopback host with an explicit port and no credentials`);
-    return { id: s.id, label: s.label, transport: 'http', url: s.url, authHeader: s.authHeader || 'Authorization', note: s.note || '', start: s.start || '' };
+    if (s.needsToken !== undefined && typeof s.needsToken !== 'boolean') throw new Error(`known-servers: ${s.id}: needsToken must be true or false`);
+    return { id: s.id, label: s.label, transport: 'http', url: s.url, authHeader: s.authHeader || 'Authorization', note: s.note || '', start: s.start || '', needsToken: s.needsToken === true };
   });
 }
 

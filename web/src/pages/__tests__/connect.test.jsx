@@ -104,6 +104,17 @@ describe("Connect page: our servers", () => {
     expect(sent("GET /api/known-servers").length).toBe(before + 1);
   });
 
+  it("tells you a running server needs a token and leaves that one field for you", async () => {
+    mockServer({ "GET /api/known-servers": () => ({ servers: [{ id: "gw", label: "MCP gateway", transport: "http", url: "http://127.0.0.1:3005/mcp", authHeader: "Authorization", note: "", start: "docker start x", running: true, needsToken: true }] }) });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.selectOptions(await screen.findByLabelText("Our servers"), "gw");
+    expect(screen.getByLabelText("Server URL")).toHaveValue("http://127.0.0.1:3005/mcp");
+    expect(await screen.findByText(/This one needs a token: paste it into Auth header value/)).toBeInTheDocument();
+    expect(screen.queryByText(/Every field is filled in/)).toBeNull();
+    expect(screen.getByLabelText("Auth header value (optional)")).toHaveValue("");
+  });
+
   it("shows no dropdown when the server lists none (or the route is missing)", async () => {
     mockServer({ "GET /api/known-servers": () => ({ servers: [] }) });
     render(<App />);
