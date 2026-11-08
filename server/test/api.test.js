@@ -315,3 +315,21 @@ test('POST /api/reset clears every saved connection (rule 3)', T, async () => { 
     assert.equal(again.json.cleared, 0);
   });
 });
+
+test('live mode: a sample connection lists its tools and answers a confirmed call with a simulated reply', T, async () => {
+  await withApp({}, async ({ call }) => {
+    const made = await call('POST', '/api/connections', { transport: 'mock', fixture: 'sample' });
+    assert.equal(made.status, 201);
+    const id = made.json.connection.id;
+    assert.equal(made.json.connection.fixture, 'sample');
+    assert.equal(made.json.test.ok, true);
+    const tools = await call('GET', `/api/connections/${id}/tools`);
+    assert.deepEqual(tools.json.tools.map((t) => t.name), ['get_time', 'add']);
+    const preview = await call('POST', `/api/connections/${id}/call/preview`, { tool: 'add', arguments: { a: 1, b: 2 } });
+    assert.equal(preview.status, 200);
+    const sent = await call('POST', `/api/connections/${id}/call`, { tool: 'add', arguments: { a: 1, b: 2 }, confirm: true, argsHash: preview.json.argsHash });
+    assert.match(sent.json.result.content[0].text, /mock result for add \(nothing was run\)/);
+    assert.equal((await call('POST', '/api/connections', { transport: 'mock', fixture: 'nope' })).status, 400);
+    assert.equal((await call('DELETE', `/api/connections/${id}`)).status, 204);
+  });
+});

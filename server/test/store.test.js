@@ -43,3 +43,17 @@ test('validation: bad scheme, credentials in the URL, missing command', () => {
   assert.throws(() => store.create({ transport: 'stdio', command: ' ' }), /command/);
   assert.throws(() => store.create({ transport: 'ws', url: 'ws://x' }), /transport/);
 });
+
+test('mock connections (the built-in samples) are session-only, show the fixture, and refuse an unknown one', () => {
+  const dir = tmpDir();
+  const store = createStore({ dir });
+  const rec = store.create({ transport: 'mock', fixture: 'hostile' });
+  assert.equal(rec.fixture, 'hostile');
+  assert.match(rec.label, /Hostile sample/);
+  assert.ok(!fs.existsSync(store.file), 'never written to disk');
+  assert.equal(store.get(rec.id).fixture, 'hostile');
+  assert.equal(createStore({ dir }).get(rec.id), null, 'a new process does not see it');
+  assert.throws(() => store.create({ transport: 'mock', fixture: '__proto__' }), /fixture must be one of/);
+  assert.throws(() => store.create({ transport: 'mock' }), /fixture must be one of/);
+  assert.ok(store.remove(rec.id));
+});

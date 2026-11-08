@@ -11,6 +11,7 @@ export function createManager({ store, pingone = null, mock = false }) {
       if (conn.transport !== 'mock') throw Object.assign(new Error('Disabled in the hosted mock.'), { code: 'mock_only' });
       return createMockClient(conn.fixture);
     }
+    if (conn.transport === 'mock') return createMockClient(conn.fixture); // an in-process sample server: no socket, no process
     if (conn.transport === 'stdio') return createStdioClient(conn);
     if (conn.transport === 'pingone') return createHttpClient({ url: pingone.mcpUrl(), getAuth: () => ['Authorization', `Bearer ${pingone.requireToken()}`] });
     return createHttpClient({ url: conn.url, getAuth: () => (conn.token ? [conn.authHeader || 'Authorization', conn.token] : null) });

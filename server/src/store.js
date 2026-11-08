@@ -6,8 +6,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { FIXTURES } from './mock.js';
 
-const TRANSPORTS = new Set(['http', 'stdio', 'pingone']);
+// 'mock' is one of the two in-process sample servers (mock.js). Like stdio it lives in memory for this session only.
+const TRANSPORTS = new Set(['http', 'stdio', 'pingone', 'mock']);
 
 // A URL with credentials or a non-http scheme is refused; query values are masked in anything shown.
 function cleanUrl(raw) {
@@ -47,13 +49,18 @@ export function createStore({ dir }) {
     return view;
   }
 
-  function create({ label, transport, url, authHeader, token, command, args, env }) {
+  function create({ label, transport, url, authHeader, token, command, args, env, fixture }) {
     if (!TRANSPORTS.has(transport)) throw new Error(`transport must be one of: ${[...TRANSPORTS].join(', ')}`);
     const rec = { id: crypto.randomUUID(), label: String(label || '').trim().slice(0, 80) || `${transport} server`, transport, createdAt: new Date().toISOString() };
     if (transport === 'http') {
       rec.url = cleanUrl(url);
       if (String(token || '').trim()) { rec.authHeader = String(authHeader || 'Authorization').trim(); rec.token = String(token).trim(); }
       const all = loadDisk(); all[rec.id] = rec; saveDisk(all);
+    } else if (transport === 'mock') {
+      if (!Object.hasOwn(FIXTURES, fixture)) throw new Error('fixture must be one of: ' + Object.keys(FIXTURES).join(', '));
+      rec.fixture = fixture;
+      rec.label = String(label || '').trim().slice(0, 80) || FIXTURES[fixture].label;
+      session.set(rec.id, rec);
     } else if (transport === 'pingone') {
       const all = loadDisk(); all[rec.id] = rec; saveDisk(all);
     } else {

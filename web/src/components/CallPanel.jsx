@@ -20,10 +20,13 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
   const [saved, setSaved] = useState([]); // saved inputs for this tool
   const [saveName, setSaveName] = useState("");
   const [savedNote, setSavedNote] = useState("");
+  const resultRef = useRef(null);
   const tool = (tools || []).find((t) => t.name === name);
   const fields = useMemo(() => fieldsOf(tool?.inputSchema), [tool]);
 
   useEffect(() => { if (pick?.name) setName(pick.name); }, [pick]);
+  // The reply lands below the form, often off screen: bring it into view when it arrives.
+  useEffect(() => { if (result) resultRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }); }, [result]);
   useEffect(() => { setValues({}); setRaw("{}"); setReview(null); setError(null); setResult(null); setSavedNote(""); }, [name, connectionId]);
   const base = `/api/connections/${encodeURIComponent(connectionId)}`;
   const want = useRef(""); // the tool the newest request is for: a late answer for another tool is dropped
@@ -136,7 +139,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
           {flagged && <p className="alert">The scan flagged this tool ({SEV[flagged]}).</p>}
         </ConfirmDialog>
       )}
-      <div role="status" aria-live="polite" data-testid="result">
+      <div ref={resultRef} role="status" aria-live="polite" data-testid="result">
         {result && !result.ok && <p className="alert">{result.text}</p>}
         {result?.ok && (
           <>
