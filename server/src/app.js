@@ -21,6 +21,7 @@ import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } f
 import { createPingone } from './pingone.js';
 import { createFlagStore, FlagError } from './flags.js';
 import { createOAuth, OAuthError } from './oauth.js';
+import { PiFlowError } from './piflow.js';
 import { createInputStore, InputError } from './inputs.js';
 import { createProxy } from './proxy/router.js';
 import { clip, scrub, scrubJson } from './redact.js';
@@ -39,7 +40,7 @@ const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 export function createApp({ env = process.env, store = mockOnly(env) ? createMockStore() : createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null, knownServers = listKnownServers } = {}) {
   const mock = mockOnly(env);
   if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
-  const oauth = createOAuth(); // third-party OAuth sign-ins (rule-16 exception): tokens in memory only
+  const oauth = createOAuth({ env }); // OAuth sign-ins: pi.flow for our PingOne, browser redirect for third parties; tokens in memory only
   const manager = createManager({ store, pingone: mock ? null : pingone, mock, oauth });
   // Saved inputs live next to the connections file (memory only when the store is virtual).
   const inputs = createInputStore({ dir: store.file ? path.dirname(store.file) : null, connectionExists: (id) => Boolean(store.get(id)) });
@@ -219,7 +220,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     const conn = oauthConn(req, res); if (!conn) return;
     try {
       const d = await oauth.discover(conn);
-      res.set('Cache-Control', 'no-store').json({ ...oauth.status(conn.id), required: d.required, issuer: d.issuer ?? oauth.status(conn.id).issuer, scopes: d.scopes ?? [], dynamicRegistration: Boolean(d.registrationEndpoint), refused: d.refused ?? null, redirectUri: `http://${req.headers.host}/api/oauth/callback` });
+      res.set('Cache-Control', 'no-store').json({ ...oauth.status(conn.id), required: d.required, method: d.method ?? null, issuer: d.issuer ?? oauth.status(conn.id).issuer, scopes: d.scopes ?? [], dynamicRegistration: Boolean(d.registrationEndpoint), refused: d.refused ?? null, redirectUri: `http://${req.headers.host}/api/oauth/callback` });
     } catch (err) { oauthFail(res, err, conn); }
   }));
   api.post('/connections/:id/oauth/start', small, wrap(async (req, res) => {
@@ -227,6 +228,21 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     const body = isObject(req.body) ? req.body : {};
     if (Object.keys(body).some((k) => k !== 'clientId') || (body.clientId !== undefined && (typeof body.clientId !== 'string' || body.clientId.length > 200))) return bad(res, 'the only accepted field is clientId (a string)');
     try { res.json(await oauth.start(conn, { clientId: body.clientId, redirectUri: `http://${req.headers.host}/api/oauth/callback` })); } catch (err) { oauthFail(res, err, conn); }
+  }));
+  // pi.flow (our PingOne): start returns an opaque run handle; the password goes to this tool only, once, never stored.
+  const piflowFail = (res, err, conn) => {
+    if (err instanceof PiFlowError) return res.status(err.status).json({ error: err.code, message: clip(scrub(err.message, secretsFor(conn))) });
+    return oauthFail(res, err, conn);
+  };
+  api.post('/connections/:id/oauth/piflow', small, wrap(async (req, res) => {
+    const conn = oauthConn(req, res); if (!conn) return;
+    try { res.json(await oauth.piflowStart(conn, { redirectUri: `http://${req.headers.host}/api/oauth/callback` })); } catch (err) { piflowFail(res, err, conn); }
+  }));
+  api.post('/connections/:id/oauth/piflow/credentials', small, wrap(async (req, res) => {
+    const conn = oauthConn(req, res); if (!conn) return;
+    const body = isObject(req.body) ? req.body : {};
+    if (Object.keys(body).some((k) => !['run', 'username', 'password'].includes(k))) return bad(res, 'accepted fields: run, username, password');
+    try { res.json(await oauth.piflowCredentials(conn.id, body.run, body)); } catch (err) { piflowFail(res, err, conn); }
   }));
   api.post('/connections/:id/oauth/signout', (req, res) => {
     const conn = oauthConn(req, res); if (!conn) return;
@@ -346,13 +362,15 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   if (pingone && !mock) {
     api.get('/pingone/status', (_req, res) => res.json(pingone.status()));
     api.post('/pingone/login', wrap(async (_req, res) => {
-      if (!pingone.configured()) return bad(res, 'Set PINGONE_ENVIRONMENT_ID and PINGONE_MCP_CLIENT_ID first.', 400, 'pingone_not_configured');
-      try { res.json({ authorizeUrl: await pingone.startLogin() }); } catch (err) { bad(res, clip(err.message), 502, 'pingone_login_failed'); }
+      if (!pingone.configured()) return bad(res, 'Set PINGONE_ENVIRONMENT_ID and PINGONE_MCP_CLIENT_ID in ~/Development/.env first.', 400, 'pingone_not_configured');
+      try { res.json(await pingone.startLogin()); } catch (err) { if (err instanceof PiFlowError) return res.status(err.status).json({ error: err.code, message: clip(err.message) }); throw err; }
     }));
-    api.get('/pingone/callback', wrap(async (req, res) => {
-      try { await pingone.handleCallback(req.query); res.redirect('/?pingone=signed-in'); }
-      catch (err) { res.redirect(`/?pingone_error=${encodeURIComponent(clip(err.message, 120))}`); }
+    api.post('/pingone/credentials', small, wrap(async (req, res) => {
+      const body = isObject(req.body) ? req.body : {};
+      if (Object.keys(body).some((k) => !['run', 'username', 'password'].includes(k))) return bad(res, 'accepted fields: run, username, password');
+      try { res.json(await pingone.credentials(body.run, body)); } catch (err) { if (err instanceof PiFlowError) return res.status(err.status).json({ error: err.code, message: clip(scrub(err.message, pingone.secrets())) }); throw err; }
     }));
+    api.post('/pingone/signout', (_req, res) => { pingone.signOut(); res.json(pingone.status()); });
   }
 
   api.use((_req, res) => bad(res, 'no such endpoint', 404));

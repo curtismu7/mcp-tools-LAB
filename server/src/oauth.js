@@ -1,5 +1,9 @@
-// OAuth sign-in for THIRD-PARTY MCP servers: a rule-16 exception (owner, 2026-11-07; docs/rule-16-waiver.md). Ping
-// sign-ins stay pi.flow: an authorization server on a Ping host is refused (a host-name heuristic, stated as such).
+// OAuth sign-in for MCP servers. Two methods, chosen by who the authorization server is:
+//  - OUR PingOne environment (p1config.js, from ~/Development/.env): pi.flow, the standard Sign in modal, no redirect
+//    (rule 16), through piflow.js;
+//  - a THIRD-PARTY server: authorization code in the browser, a rule-16 exception (owner, 2026-11-07;
+//    docs/rule-16-waiver.md).
+// Any other Ping host is refused (a host-name heuristic, stated as such): Ping sign-ins are pi.flow only.
 //
 // Flow (MCP authorization spec, 2025-06-18): the server's 401 names its protected-resource metadata (RFC 9728), which
 // names the authorization server; its metadata (RFC 8414 / OIDC discovery) gives the endpoints. The tool registers
@@ -11,6 +15,8 @@
 // by an API, never logged and never written to disk; a restart forgets them. Every metadata URL a server hands us
 // must be https unless it is a loopback host, redirects are not followed, replies are size- and time-capped.
 import crypto from 'node:crypto';
+import { p1Config, sameIssuer } from './p1config.js';
+import { createPiFlow } from './piflow.js';
 import { isLoopbackHost } from './security.js';
 
 const TIMEOUT_MS = 10_000;
@@ -51,7 +57,9 @@ export function parseChallenge(header) {
   return out;
 }
 
-export function createOAuth() {
+export function createOAuth({ env = {} } = {}) {
+  const p1 = p1Config(env);
+  const piflow = createPiFlow();
   const sessions = new Map(); // connection id -> { issuer, clientId, clientSecret, accessToken, refreshToken, expiresAt, scope, tokenEndpoint, resource }
   const pending = new Map(); // state -> { connectionId, verifier, redirectUri, issuer, clientId, clientSecret, tokenEndpoint, resource, scope, at }
   const discovered = new Map(); // connection id -> { at, info }
@@ -77,7 +85,12 @@ export function createOAuth() {
     }
     if (!prm || !prm.authorization_servers.length) throw new OAuthError('the server asks for a token but publishes no protected-resource metadata naming an authorization server', 'oauth_no_metadata');
     const issuer = checkedUrl(prm.authorization_servers[0], 'the authorization server');
-    if (isPingHost(issuer.hostname)) {
+    const ours = sameIssuer(issuer.toString(), p1.issuer);
+    if (ours && !p1.clientId) {
+      const info = { required: true, method: 'piflow', refused: 'This server signs in with our PingOne environment (pi.flow). Set PINGONE_MCP_CLIENT_ID in ~/Development/.env to the PingOne application for it, then restart this tool.', issuer: issuer.toString() };
+      discovered.set(conn.id, { at: Date.now(), info }); return info;
+    }
+    if (!ours && isPingHost(issuer.hostname)) {
       const info = { required: true, refused: 'This authorization server is on a Ping host. Ping sign-in is pi.flow only (rule 16), so this tool will not open a redirect sign-in for it. Save the server with a token instead.', issuer: issuer.toString() };
       discovered.set(conn.id, { at: Date.now(), info }); return info;
     }
@@ -90,7 +103,7 @@ export function createOAuth() {
     if (String(meta.issuer || '').replace(/\/$/, '') !== issuer.toString().replace(/\/$/, '')) throw new OAuthError('the authorization server metadata names a different issuer', 'oauth_issuer_mismatch');
     if (Array.isArray(meta.code_challenge_methods_supported) && !meta.code_challenge_methods_supported.includes('S256')) throw new OAuthError('the authorization server does not support PKCE S256', 'oauth_no_pkce');
     const info = {
-      required: true, issuer: meta.issuer,
+      required: true, issuer: meta.issuer, method: ours ? 'piflow' : 'redirect',
       authorizationEndpoint: checkedUrl(meta.authorization_endpoint, 'the authorization endpoint').toString(),
       tokenEndpoint: checkedUrl(meta.token_endpoint, 'the token endpoint').toString(),
       registrationEndpoint: meta.registration_endpoint ? checkedUrl(meta.registration_endpoint, 'the registration endpoint').toString() : null,
@@ -106,6 +119,7 @@ export function createOAuth() {
     const info = await discover(conn, { fresh: true });
     if (!info.required) throw new OAuthError('this server does not ask for a token', 'oauth_not_required');
     if (info.refused) throw new OAuthError(info.refused, 'oauth_ping_refused');
+    if (info.method === 'piflow') throw new OAuthError('this server signs in with our PingOne environment: use the pi.flow sign-in, never a redirect (rule 16)', 'oauth_use_piflow');
     let id = String(clientId || '').trim() || null; let secret = null;
     if (!id) {
       if (!info.registrationEndpoint) throw new OAuthError('this authorization server has no dynamic registration: type a client id registered with redirect URI ' + redirectUri, 'oauth_needs_client_id');
@@ -153,8 +167,21 @@ export function createOAuth() {
     } catch { sessions.delete(connectionId); }
   }
 
+  const keep = (connectionId, t, base) => sessions.set(connectionId, { ...base, accessToken: t.access_token, refreshToken: typeof t.refresh_token === 'string' ? t.refresh_token : null, expiresAt: Date.now() + (Number(t.expires_in) > 0 ? Number(t.expires_in) : 3600) * 1000, scope: typeof t.scope === 'string' ? t.scope : base.scope });
+
+  // pi.flow sign-in with our PingOne: the browser sends a username and password to this tool, never to PingOne.
+  async function piflowStart(conn, { redirectUri }) {
+    const info = await discover(conn, { fresh: true });
+    if (info.method !== 'piflow') throw new OAuthError('this server does not sign in with our PingOne environment', 'oauth_not_piflow');
+    if (info.refused) throw new OAuthError(info.refused, 'oauth_needs_client_id');
+    const scope = ['openid', ...info.scopes.filter((x) => x !== 'openid')].join(' ');
+    const base = { issuer: info.issuer, clientId: p1.clientId, clientSecret: null, tokenEndpoint: info.tokenEndpoint, resource: info.resource, scope };
+    return piflow.start({ key: conn.id, meta: { issuer: info.issuer, authorizationEndpoint: info.authorizationEndpoint, tokenEndpoint: info.tokenEndpoint }, clientId: p1.clientId, redirectUri, resource: info.resource, scope, onTokens: (id, t) => keep(id, t, base) });
+  }
+
   return {
-    discover, start, callback, fresh,
+    discover, start, callback, fresh, piflowStart,
+    piflowCredentials: (connectionId, run, creds) => piflow.credentials(run, creds, connectionId),
     auth: (connectionId) => { const s = sessions.get(connectionId); return s && s.expiresAt > Date.now() ? ['Authorization', `Bearer ${s.accessToken}`] : null; },
     status(connectionId) {
       const s = sessions.get(connectionId);
@@ -162,6 +189,6 @@ export function createOAuth() {
     },
     secrets: (connectionId) => { const s = sessions.get(connectionId); return s ? [s.accessToken, s.refreshToken, s.clientSecret].filter(Boolean) : []; },
     signOut(connectionId) { sessions.delete(connectionId); discovered.delete(connectionId); for (const [k, p] of pending) if (p.connectionId === connectionId) pending.delete(k); },
-    clear() { sessions.clear(); pending.clear(); discovered.clear(); },
+    clear() { sessions.clear(); pending.clear(); discovered.clear(); piflow.clear(); },
   };
 }

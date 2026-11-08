@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { get, post } from "../lib/api.js";
 import { Untrusted } from "../lib/Untrusted.jsx";
+import SignInModal from "./SignInModal.jsx";
 
-// OAuth sign-in for a third-party MCP server (a rule-16 exception: Ping sign-ins stay pi.flow and are refused here).
+// OAuth sign-in for an MCP server: our PingOne by pi.flow (the standard Sign in dialog), a third-party server by a
+// browser sign-in in a new tab (a rule-16 exception). Any other Ping server is refused.
 // Shown only when the server asks for a token. The sign-in opens in a new tab; this panel waits for it to finish.
 // No token is ever shown: the server keeps it in memory.
 const POLL_MS = 2000;
@@ -13,6 +15,7 @@ export default function OAuthPanel({ conn, onSignedIn }) {
   const [err, setErr] = useState("");
   const [clientId, setClientId] = useState("");
   const [waiting, setWaiting] = useState(false);
+  const [modal, setModal] = useState(false);
   const timer = useRef(null);
   const base = `/api/connections/${encodeURIComponent(conn.id)}/oauth`;
 
@@ -57,6 +60,14 @@ export default function OAuthPanel({ conn, onSignedIn }) {
               <span className="okt" role="status" data-testid="oauth-state">Signed in{s.expiresAt ? `, token renews before ${new Date(s.expiresAt).toLocaleTimeString()}` : ""}{s.canRefresh ? "" : " (no refresh: sign in again when it expires)"}</span>
               <button type="button" className="btn" onClick={signOut}>Sign out</button>
             </div>
+          ) : s.method === "piflow" ? (
+            <>
+              <div className="controls">
+                <button type="button" className="btn primary" onClick={() => setModal(true)} disabled={modal}>Sign in with PingOne</button>
+                <span className="muted small" data-testid="oauth-state">Not signed in. This server uses our PingOne environment: pi.flow sign-in, no redirect.</span>
+              </div>
+              {modal && <SignInModal startUrl={`${base}/piflow`} credentialsUrl={`${base}/piflow/credentials`} onClose={() => setModal(false)} onDone={() => { setModal(false); load().then(() => onSignedIn?.()); }} />}
+            </>
           ) : (
             <>
               {!s.dynamicRegistration && (
