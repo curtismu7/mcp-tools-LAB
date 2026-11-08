@@ -21,12 +21,37 @@ export function keptHeaders(headers, { authLabel } = {}) {
   return out;
 }
 
-// A captured body: the text (capped, scrubbed), the parsed JSON when it parses, or the JSON-RPC messages of an SSE body.
+// Each secret as sent and as it appears inside a JSON string (a `"` or `\` in it is escaped there).
+export function secretVariants(secrets) {
+  const out = new Set();
+  for (const s of secrets) if (typeof s === 'string' && s.length >= 4) { out.add(s); out.add(JSON.stringify(s).slice(1, -1)); }
+  return [...out];
+}
+
+// Scrubs a stream of text chunks: a secret split across two chunks is still caught, because the end of a chunk that
+// could be the start of a secret is held back until the next chunk (or the end) shows what follows. Text that cannot
+// start a secret is passed on at once, so an open SSE stream is not delayed.
+export function createStreamScrubber(secrets) {
+  const list = secretVariants(secrets);
+  let held = '';
+  const holdLen = (text) => {
+    let best = 0;
+    for (const sec of list) for (let k = Math.min(sec.length - 1, text.length); k > best; k -= 1) if (text.endsWith(sec.slice(0, k))) { best = k; break; }
+    return best;
+  };
+  return {
+    push(chunk) { const t = scrub(held + chunk, list); const k = holdLen(t); held = t.slice(t.length - k); return t.slice(0, t.length - k); },
+    end() { const t = held; held = ''; return t; }, // a strict prefix of a secret is not the secret
+  };
+}
+
+// A captured body: the text (scrubbed, then capped), the parsed JSON when it parses, or the JSON-RPC messages of an SSE
+// body. Scrubbing comes first so a secret that straddles the cap is not left half in the log.
 export function captureBody(text, { secrets = [], contentType = '' } = {}) {
-  const raw = String(text ?? '');
-  const bytes = Buffer.byteLength(raw);
-  const truncated = bytes > MAX_BODY;
-  const clean = scrub(truncated ? Buffer.from(raw).subarray(0, MAX_BODY).toString('utf8') : raw, secrets);
+  const scrubbed = scrub(String(text ?? ''), secretVariants(secrets));
+  const bytes = Buffer.byteLength(String(text ?? ''));
+  const truncated = Buffer.byteLength(scrubbed) > MAX_BODY;
+  const clean = truncated ? Buffer.from(scrubbed).subarray(0, MAX_BODY).toString('utf8') : scrubbed;
   const out = { bytes, truncated, tokens: estimateTokens(clean) };
   if (!clean) return out;
   if (/text\/event-stream/i.test(contentType)) { out.sse = sseMessages(clean); out.text = clean; return out; }

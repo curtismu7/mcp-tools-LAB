@@ -25,7 +25,7 @@ export function createStore({ dir }) {
   function loadDisk() {
     try {
       const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-      const out = {};
+      const out = Object.create(null); // a planted "__proto__" key stays a plain key
       // Only http entries are honoured from disk; a stdio entry planted in the file is ignored.
       for (const [id, rec] of Object.entries(parsed && typeof parsed === 'object' ? parsed : {})) if (rec?.transport === 'http' || rec?.transport === 'pingone') out[id] = rec;
       return out;
@@ -66,12 +66,13 @@ export function createStore({ dir }) {
     return rec;
   }
 
-  const get = (id) => session.get(id) || loadDisk()[id] || null;
+  // Own keys only: an id such as __proto__ or constructor must never resolve to a built-in.
+  const get = (id) => { const all = loadDisk(); return session.get(id) || (Object.hasOwn(all, id) ? all[id] : null); };
   const list = () => [...Object.values(loadDisk()), ...session.values()];
   function remove(id) {
     if (session.delete(id)) return true;
     const all = loadDisk();
-    if (!all[id]) return false;
+    if (!Object.hasOwn(all, id)) return false;
     delete all[id]; saveDisk(all); return true;
   }
   // Every secret string a connection holds, for scrub().

@@ -135,7 +135,7 @@ test('Real mode: http passthrough uses the saved upstream credential; neither to
   });
 });
 
-test('an upstream that echoes the credential back: the client gets the raw passthrough, the log is scrubbed', T, async () => {
+test('an upstream that echoes the credential back: scrubbed for the client and in the log', T, async () => {
   const fake = await startFakeMcp({ token: 'Bearer expected-other' }); // 401 body echoes the header it got
   await withApp({}, async (app) => {
     const c = await app.call('POST', '/api/connections', { transport: 'http', url: fake.url, token: UPSTREAM });
@@ -144,6 +144,8 @@ test('an upstream that echoes the credential back: the client gets the raw passt
     const r = await agent(app, token)(c.json.connection.id, INIT);
     assert.equal(r.status, 401);
     assert.equal(r.headers.get('www-authenticate'), null, 'no OAuth challenge is relayed');
+    assert.ok(!r.text.includes('upstream-secret-value-123'), 'the client does not get the saved credential back either (rule 4)');
+    assert.match(r.text, /\[redacted\]/);
     const f = (await app.call('GET', '/api/proxy/flows')).json.flows.at(-1);
     assert.match(f.error, /refused the saved credential/);
     const d = (await app.call('GET', `/api/proxy/flows/${f.id}`)).text;

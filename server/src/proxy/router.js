@@ -4,32 +4,41 @@
 //
 // Safety (each has a test in proxy.test.js):
 //  - off by default; the operator turns it on from this tool's own page, which mints a fresh random proxy token. Every
-//    proxied request needs `Authorization: Bearer <that token>`, so another local process cannot borrow a saved
-//    connection's upstream credential. Turning it off (or Reset, or a restart) kills the token.
+//    proxied request needs `Authorization: Bearer <that token>`. Turning it off (or Reset, or a restart) kills the token
+//    and closes every stream still open. The token keeps out web pages and anything that has not read it from this
+//    tool; it is NOT a barrier against programs already running as you on this machine (they can read it from
+//    GET /api/proxy, as they can read the saved connections file itself).
 //  - the app-wide loopback Host check still applies; a request that carries a browser Origin from another site is
 //    refused (403), so a web page cannot drive it. No CORS headers are ever sent.
 //  - the client's Authorization header is never forwarded upstream; the upstream credential is the saved connection's
-//    own (write-only, as everywhere in this tool). Neither is stored in the flow log (see flows.js).
+//    own (write-only, as everywhere in this tool). Neither is stored in the flow log (see flows.js), and an upstream
+//    that echoes the saved credential has it scrubbed from what the client receives too (rule 4).
 //  - Mock mode (rule 19) offers the two built-in fixtures only, answered in this process; saved connections need Real.
 //  - http targets: raw passthrough (bytes streamed, SSE included), redirects refused. stdio / PingOne / fixtures:
 //    bridged (JSON-RPC answered through this tool's own client for that connection).
 import crypto from 'node:crypto';
 import express from 'express';
 import { createMockClient, FIXTURES } from '../mock.js';
-import { clip, scrub } from '../redact.js';
-import { captureBody, createFlowLog, keptHeaders, MAX_BODY, MAX_FLOWS, rpcSummary, summary } from './flows.js';
+import { clip, scrub, scrubJson } from '../redact.js';
+import { captureBody, createFlowLog, createStreamScrubber, keptHeaders, MAX_BODY, MAX_FLOWS, rpcSummary, summary } from './flows.js';
 import { TOKEN_METHOD } from './tokens.js';
 
-const HEADER_TIMEOUT_MS = 30_000;
+const TRANSPORTS = new Set(['http', 'stdio', 'pingone']);
 const FIXTURE_IDS = Object.keys(FIXTURES).map((f) => `mock-${f}`);
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
-export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
+export function createProxy({ store, manager, getMode, mockOnly, secretsFor, headerTimeoutMs = 30_000 }) {
   const flows = createFlowLog();
   const state = { enabled: false, token: null };
   const fixtureClients = new Map();
+  const inflight = new Set(); // AbortControllers of passthrough requests still open
 
-  function setEnabled(on) { state.enabled = Boolean(on); state.token = on ? crypto.randomBytes(24).toString('base64url') : null; }
+  const closeAll = () => { for (const ac of inflight) ac.abort(new Error('the proxy was turned off')); inflight.clear(); };
+  function setEnabled(on) {
+    state.enabled = Boolean(on);
+    state.token = on ? crypto.randomBytes(24).toString('base64url') : null;
+    if (!on) closeAll();
+  }
   const tokenOk = (header) => {
     if (!state.token || typeof header !== 'string') return false;
     const a = Buffer.from(header); const b = Buffer.from(`Bearer ${state.token}`);
@@ -47,7 +56,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
   function resolve(id) {
     if (FIXTURE_IDS.includes(id)) return { kind: 'fixture', route: fixtureRoute(id) };
     const conn = store.get(id);
-    if (!conn) return { status: 404, error: 'not_found', message: 'no such proxy route' };
+    if (!conn || typeof conn !== 'object' || conn.id !== id || !TRANSPORTS.has(conn.transport)) return { status: 404, error: 'not_found', message: 'no such proxy route' };
     if (!realAllowed()) return { status: 409, error: 'mock_mode', message: mockOnly ? 'This copy is mock only: only the built-in sample servers can be proxied.' : 'Saved servers are proxied in Real mode only. Switch the header toggle to Real, or use a built-in sample route.' };
     return { kind: 'conn', conn };
   }
@@ -65,7 +74,8 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
     if (!tokenOk(req.headers.authorization)) return res.status(401).json({ error: 'proxy_token', message: 'Send Authorization: Bearer <proxy token> (shown on the Live proxy page; it changes each time the proxy is turned on).' });
     return next();
   });
-  proxy.all('/mcp/:id', express.raw({ type: () => true, limit: '4mb' }), async (req, res) => {
+  proxy.all('/mcp/:id', express.raw({ type: () => true, limit: '4mb' }), (req, res, next) => handle(req, res).catch(next));
+  async function handle(req, res) {
     const target = resolve(req.params.id);
     if (target.status) return res.status(target.status).json({ error: target.error, message: target.message });
     const reqText = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
@@ -73,7 +83,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
     const reqBody = captureBody(reqText, { secrets, contentType: req.headers['content-type'] });
     const conn = target.conn;
     const flow = flows.add({
-      at: new Date().toISOString(), route: req.params.id, routeLabel: clip(conn?.label ?? target.route.label, 80),
+      at: new Date().toISOString(), route: req.params.id, routeLabel: clip(conn?.label ?? target.route?.label ?? req.params.id, 80),
       transport: conn?.transport ?? 'mock', via: conn?.transport === 'http' ? 'passthrough' : 'bridge',
       httpMethod: req.method, ...rpcSummary(reqBody.json), status: null, ms: null, open: true,
       request: { headers: keptHeaders(req.headers, { authLabel: '[proxy token, not forwarded]' }), body: reqBody },
@@ -83,12 +93,20 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
     const done = (status, response, error = null) => Object.assign(flow, { status, ms: Date.now() - started, open: false, response, error: error && clip(scrub(error, secrets)) });
     try {
       if (conn?.transport === 'http') await passthrough({ req, res, conn, reqText, secrets, flow, started, done });
-      else await bridge({ req, res, target, reqBody, secrets, done });
+      else await bridge({ req, res, target, reqText, secrets, done });
     } catch (err) {
       done(502, null, err.message);
       if (!res.headersSent) res.status(502).json({ error: 'upstream_error', message: clip(scrub(err.message, secrets)) });
       else res.end();
     }
+  }
+  proxy.use((_req, res) => res.status(404).json({ error: 'not_found', message: 'proxy routes are /proxy/mcp/<id>' }));
+  // JSON errors only (never Express's HTML page with a stack): a body over 4 MB, a parse failure, anything else.
+  proxy.use((err, _req, res, _next) => {
+    if (res.headersSent) return res.end();
+    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'too_large', message: 'request body is larger than 4 MB' });
+    console.error('[mcp-tools] proxy error:', err.code || err.name);
+    return res.status(500).json({ error: 'server_error' });
   });
 
   async function passthrough({ req, res, conn, reqText, secrets, flow, started, done }) {
@@ -96,8 +114,9 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
     for (const k of ['content-type', 'accept', 'mcp-session-id', 'mcp-protocol-version', 'last-event-id']) if (req.headers[k]) headers[k] = req.headers[k];
     if (conn.token) headers[conn.authHeader || 'Authorization'] = conn.token;
     const ac = new AbortController();
-    res.on('close', () => ac.abort());
-    const timer = setTimeout(() => ac.abort(new Error(`upstream sent no response headers in ${HEADER_TIMEOUT_MS / 1000}s`)), HEADER_TIMEOUT_MS);
+    inflight.add(ac);
+    res.on('close', () => { ac.abort(); inflight.delete(ac); });
+    const timer = setTimeout(() => ac.abort(new Error(`upstream sent no response headers in ${headerTimeoutMs / 1000}s`)), headerTimeoutMs);
     let up;
     try {
       up = await fetch(conn.url, { method: req.method, headers, body: req.method === 'POST' ? reqText : undefined, redirect: 'manual', signal: ac.signal });
@@ -112,7 +131,15 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
     if (up.status === 401) flow.error = 'upstream refused the saved credential (401); the proxy does not run OAuth for the client';
     flow.status = up.status; // visible while an SSE stream is still open
     flow.response = { headers: keptHeaders(up.headers), body: { bytes: 0, truncated: false, tokens: 0 } };
-    const chunks = []; let kept = 0; let bytes = 0;
+    // The client gets the upstream reply with every secret of this connection scrubbed out, streamed as it arrives.
+    const scrubber = createStreamScrubber(secrets);
+    const dec = new TextDecoder();
+    let logged = ''; let bytes = 0;
+    const emit = async (text) => {
+      if (!text) return;
+      if (logged.length < MAX_BODY) logged += text.slice(0, MAX_BODY - logged.length + 1);
+      if (!res.write(text)) await new Promise((r) => { res.once('drain', r); res.once('close', r); }); // backpressure
+    };
     const reader = up.body?.getReader();
     if (reader) {
       res.flushHeaders();
@@ -121,14 +148,15 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
           const { done: end, value } = await reader.read();
           if (end) break;
           bytes += value.length;
-          if (kept < MAX_BODY) { chunks.push(Buffer.from(value)); kept += value.length; }
-          res.write(value);
           flow.response.body.bytes = bytes;
+          await emit(scrubber.push(dec.decode(value, { stream: true })));
+          if (res.destroyed) break;
         }
-      } catch (err) { if (!ac.signal.aborted) throw err; }
+        await emit(scrubber.push(dec.decode()) + scrubber.end());
+      } catch (err) { if (!ac.signal.aborted) throw err; } finally { reader.cancel().catch(() => {}); inflight.delete(ac); }
     }
     res.end();
-    const body = captureBody(Buffer.concat(chunks).toString('utf8'), { secrets, contentType: out['content-type'] });
+    const body = captureBody(logged, { secrets, contentType: out['content-type'] });
     body.bytes = bytes; body.truncated = bytes > MAX_BODY;
     done(up.status, { headers: keptHeaders(up.headers), body }, flow.error);
   }
@@ -142,12 +170,13 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
     return manager.client(target.conn.id);
   }
   // JSON-RPC answered through this tool's own client for that connection (fixture, stdio or PingOne).
-  async function bridge({ req, res, target, reqBody, secrets, done }) {
+  async function bridge({ req, res, target, reqText, secrets, done }) {
     if (req.method === 'DELETE') { res.status(204).end(); return done(204, null); }
     if (req.method !== 'POST') { res.status(405).set('Allow', 'POST, DELETE').json({ error: 'method_not_allowed', message: 'This route is bridged: POST JSON-RPC only (no server-sent stream).' }); return done(405, null); }
-    const msg = reqBody.json;
+    let msg = null; // the request as sent (the flow log holds a scrubbed, capped copy; never forward that)
+    try { msg = JSON.parse(reqText); } catch { msg = null; }
     const reply = (status, payload) => {
-      const text = JSON.stringify(payload);
+      const text = JSON.stringify(scrubJson(payload, secrets)); // a bridged server's echo of a secret is scrubbed too
       res.status(status).type('application/json').send(text);
       done(status, { headers: { 'content-type': 'application/json' }, body: captureBody(text, { secrets, contentType: 'application/json' }) });
     };
@@ -188,6 +217,6 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor }) {
 
   return {
     proxy, api,
-    reset() { flows.clear(); setEnabled(false); fixtureClients.clear(); },
+    reset() { setEnabled(false); flows.clear(); fixtureClients.clear(); },
   };
 }

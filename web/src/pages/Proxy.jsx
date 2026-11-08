@@ -15,7 +15,7 @@ function Body({ body }) {
   const text = body.json !== undefined ? pretty(body.json) : body.sse ? pretty(body.sse) : body.text;
   return (
     <>
-      <p className="muted small">{body.bytes} bytes, ~{body.tokens} tokens{body.sse ? ", server-sent events" : ""}{body.truncated ? `, first ${Math.round(text.length / 1024)} KB kept` : ""}</p>
+      <p className="muted small">{body.bytes} bytes, ~{body.tokens} tokens{body.sse ? ", server-sent events" : ""}{body.truncated ? ", only the first 64 KB kept" : ""}</p>
       <div className="proxy__pre"><Untrusted text={text} block /></div>
     </>
   );
@@ -103,7 +103,7 @@ export default function Proxy({ modeSource }) {
                   <tr key={f.id} aria-selected={open?.id === f.id} data-testid="flow-row">
                     <td>{time(f.at)}</td>
                     <td><Untrusted text={f.routeLabel} /></td>
-                    <td><button type="button" className="linkish" onClick={() => show(f.id)}><Untrusted text={f.rpcMethod || f.httpMethod} /></button></td>
+                    <td><button type="button" className="btn" onClick={() => show(f.id)}><Untrusted text={f.rpcMethod || f.httpMethod} /></button></td>
                     <td className={f.open ? "muted" : f.status >= 400 || f.error ? "badt" : "okt"}>{f.open ? "open" : f.status}</td>
                     <td>{f.ms ?? ""}</td>
                     <td>{f.requestTokens} / {f.responseTokens}</td>
