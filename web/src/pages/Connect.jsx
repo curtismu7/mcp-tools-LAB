@@ -38,6 +38,20 @@ function ConnectForm({ config, onCreated, onGo }) {
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(null);
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  // Our own MCP servers, with whether each is running now. Choosing one fills every field; nothing else needs typing.
+  const [known, setKnown] = useState([]);
+  const [picked, setPicked] = useState("");
+  const loadKnown = useCallback(async () => { const r = await get("/api/known-servers"); setKnown(r.ok ? r.data?.servers || [] : []); }, []);
+  useEffect(() => { loadKnown(); }, [loadKnown]);
+  const chosen = known.find((s) => s.id === picked);
+  function choose(e) {
+    const id = e.target.value;
+    setPicked(id);
+    const k = known.find((s) => s.id === id);
+    if (!k) return;
+    setF((p) => ({ ...p, transport: "http", label: k.label, url: k.url, authHeader: k.authHeader || "Authorization", token: "" }));
+    setMsg(null);
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -61,6 +75,24 @@ function ConnectForm({ config, onCreated, onGo }) {
   return (
     <form className="card" onSubmit={submit} aria-labelledby="connect-h">
       <h3 id="connect-h">New connection</h3>
+      {known.length > 0 && (
+        <div className="fields">
+          <label>Our servers
+            <select value={picked} onChange={choose} onFocus={loadKnown}>
+              <option value="">Choose one of our servers...</option>
+              {known.map((k) => <option key={k.id} value={k.id}>{k.running ? "Running" : "Not running"} - {k.label}</option>)}
+            </select>
+          </label>
+          {chosen && chosen.running && <p className="small okt" role="status">Running. Every field is filled in: press Connect and test.</p>}
+          {chosen && !chosen.running && (
+            <p className="small badt" role="status">
+              Not running yet. Start it, then check again: <code>{chosen.start}</code>{" "}
+              <button type="button" className="btn" onClick={loadKnown}>Check again</button>
+            </p>
+          )}
+          {chosen && chosen.note && <p className="small muted">{chosen.note}</p>}
+        </div>
+      )}
       <div className="seg" role="group" aria-label="Transport">
         {["http", "stdio", ...(config?.pingone?.enabled ? ["pingone"] : [])].map((t) => (
           <button key={t} type="button" className="btn" aria-pressed={f.transport === t} onClick={() => setF((p) => ({ ...p, transport: t }))}>

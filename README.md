@@ -23,7 +23,7 @@ Built and tested. On a clean clone with nothing else checked out, `npm test` run
 - Server: Streamable HTTP and stdio MCP clients, tools, resources, prompts and the other protocol methods, saved connections, the confirm-gated `tools/call`, the scanner library and CLI, `GET /api/health` (`demo-health/1`), doctor.
 - Scanner: 19 rules with stable ids and fixed severities (info, warn, high), evidence spans, invisible/bidi/tag/homoglyph detection with the characters made visible, name-shadowing against a trusted-names list, size/depth/count budgets that end in a "scan truncated" finding, and a machine-readable `scan-report/1` ([schema](docs/scan-report.schema.json)).
 - An always-on test that scans a committed snapshot of what the real [hostile-mcp](https://github.com/curtismu7/hostile-mcp-LAB) server serves (`server/test/fixtures/hostile-snapshot.json`, captured by `node scripts/capture-hostile-snapshot.mjs`, source commit recorded inside it): its poisoned tools, resource and prompt are flagged, its benign tools are not, and the rug-pull shows up on the second list. If a local checkout is newer than the snapshot the test only warns. The same assertions also run as an optional live test that clones the real server (below).
-- Web UI: Connect page (saved connections, HTTP or stdio, test, write-only token), Server page (Tools / Resources / Prompts, scan-before-first-use banner, list-changed signal, Scan, verdict, findings by severity with evidence, "what this scan cannot catch"), a call panel with a schema form and a confirm dialog, offline snapshot scan with report download, two stories (generic, airlines and banking packs) with a presenter mode, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), a limits page, light and dark themes. Untrusted strings render as inert text only.
+- Web UI: Connect page (an **Our servers** dropdown that fills every field for a server this family runs, saved connections, HTTP or stdio, test, write-only token), Server page (Tools / Resources / Prompts, scan-before-first-use banner, list-changed signal, Scan, verdict, findings by severity with evidence, "what this scan cannot catch"), a call panel with a schema form and a confirm dialog, offline snapshot scan with report download, two stories (generic, airlines and banking packs) with a presenter mode, a ReactFlow diagram (movable boxes, Simulate, Reset, speed), a limits page, light and dark themes. Untrusted strings render as inert text only.
 
 Not verified:
 
@@ -54,6 +54,12 @@ npm run dev        # API on 4810, Vite on 4811
 ```
 
 `npm start` serves the built UI from `web/dist`, so run `npm run build` first. Ports start at 4800 so they stay clear of the other demos.
+
+### Our servers (Connect page)
+
+The Connect form opens with an **Our servers** dropdown. Each entry says whether it is running right now (a bare TCP connect to a loopback port; nothing is sent). Choosing one fills the name, URL and auth header; for one that is running you only press **Connect and test**. For one that is not, the page shows the command that starts it and a **Check again** button.
+
+The list is `server/data/known-servers.json`: loopback `http` servers with an explicit port, no credentials (the loader refuses anything else, and a test pins the committed file). It ships with the Everything reference server (`127.0.0.1:4730`) and the live hostile-mcp (`127.0.0.1:4701`). Add an entry there to add a server. In Docker, "loopback" is the container, so servers on your host show as not running; run the lab on the host (`npm start`) to use the dropdown with them. The hosted mock lists none.
 
 ### What to do if the port is taken
 
