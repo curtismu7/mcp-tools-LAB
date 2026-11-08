@@ -86,7 +86,7 @@ async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read
 }
 
 import { createPiFlow } from '../src/piflow.js';
-import { checkAudience } from '../src/oauth.js';
+import { checkAudience, parseResourceMap } from '../src/oauth.js';
 import { loadSharedP1, p1Config } from '../src/p1config.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -237,13 +237,13 @@ test('the code must come back with our state: a different state, or none, is ref
   }
 });
 
-test('startup copies only the three PingOne keys from the shared settings file, real env wins, and an unsafe issuer override is ignored', () => {
+test('startup copies only the five PingOne keys (three ids, two settings) from the shared settings file, real env wins, and an unsafe issuer override is ignored', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'p1env-'));
   const file = path.join(dir, '.env');
-  fs.writeFileSync(file, ['PINGONE_ENVIRONMENT_ID=env-from-file', 'PINGONE_REGION=eu', 'PINGONE_MCP_CLIENT_ID=client-from-file', 'PINGONE_CLIENT_SECRET=must-not-load', 'MCPTOOLS_P1_ISSUER=https://evil.example/as', 'MCPTOOLS_TOKEN=must-not-load', 'OTHER=1'].join('\n'));
+  fs.writeFileSync(file, ['PINGONE_ENVIRONMENT_ID=env-from-file', 'PINGONE_REGION=eu', 'PINGONE_MCP_CLIENT_ID=client-from-file', 'MCPTOOLS_P1_SCOPES=tools', 'MCPTOOLS_P1_RESOURCES=http://127.0.0.1:1/mcp=aud-x', 'PINGONE_CLIENT_SECRET=must-not-load', 'MCPTOOLS_P1_ISSUER=https://evil.example/as', 'MCPTOOLS_TOKEN=must-not-load', 'OTHER=1'].join('\n'));
   const env = { STANDALONE_ENV: file, PINGONE_REGION: 'com' };
   loadSharedP1(env);
-  assert.deepEqual(Object.keys(env).sort(), ['PINGONE_ENVIRONMENT_ID', 'PINGONE_MCP_CLIENT_ID', 'PINGONE_REGION', 'STANDALONE_ENV']);
+  assert.deepEqual(Object.keys(env).sort(), ['MCPTOOLS_P1_RESOURCES', 'MCPTOOLS_P1_SCOPES', 'PINGONE_ENVIRONMENT_ID', 'PINGONE_MCP_CLIENT_ID', 'PINGONE_REGION', 'STANDALONE_ENV']);
   assert.equal(env.PINGONE_REGION, 'com', 'a real env var wins');
   assert.equal(p1Config(env).issuer, 'https://auth.pingone.com/env-from-file/as');
   assert.equal(p1Config({ ...env, MCPTOOLS_P1_ISSUER: 'http://auth.example.test/as' }).issuer, 'https://auth.pingone.com/env-from-file/as', 'plain http to a non-loopback host is ignored');
@@ -336,4 +336,98 @@ test("a list that also names PingOne's API is refused (it would work there), the
   assert.match(msg, /srv\.example\/mcp/); assert.ok(!/SSS|key=|frag|END/.test(msg), 'no query or fragment in the message');
   const t0 = Date.now(); assert.throws(() => checkAudience(jwt(`${'/'.repeat(60_000)}x`), 'http://127.0.0.1:1/mcp')); assert.ok(Date.now() - t0 < 500, 'linear time');
   assert.doesNotMatch(msgOf('bad\n<script>‮', 'http://127.0.0.1:1/mcp'), /[^\x20-\x7e]/, 'printable ASCII only');
+});
+
+// MCPTOOLS_P1_RESOURCES maps ONE connection URL to ONE audience in our PingOne (a server that names such an audience in its
+// metadata, like the Banking MCP server). The server alone can never choose.
+test('a mapped audience is requested, checked and accepted: only for that URL, only when the server names exactly it', T, async () => {
+  const probe = await fakeP1({ resource: 'banking.example.demo' });
+  const withMap = (w, url) => startApp({ env: { ...ENV, MCPTOOLS_P1_ISSUER: w.issuer, MCPTOOLS_P1_RESOURCES: `${url}=banking.example.demo` } });
+  const signIn = async (app, w) => {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    const run = (await app.call('POST', `/api/connections/${id}/oauth/piflow`, {})).json;
+    const done = await app.call('POST', `/api/connections/${id}/oauth/piflow/credentials`, { run: run.run, username: 'alice', password: PASSWORD });
+    return { id, run, done };
+  };
+  // 1. mapped and named: the audience is the mapped one, PingOne is asked for it, the token's aud is checked against it
+  const app = await withMap(probe, probe.mcp);
+  try {
+    const { id, done } = await signIn(app, probe);
+    assert.equal(done.json.state, 'signed_in');
+    assert.equal(probe.st.authorize.resource, 'banking.example.demo'); assert.equal(probe.st.tokenReq.resource, 'banking.example.demo');
+    assert.equal((await app.call('GET', `/api/connections/${id}/tools`)).json.tools[0].name, 'p1_tool');
+    assert.ok(probe.st.bearers.length > 0);
+    assert.deepEqual(probe.st.bearers.map((b) => JSON.parse(Buffer.from(b.split('.')[1], 'base64url')).aud), probe.st.bearers.map(() => 'banking.example.demo'), 'every token sent carries the mapped audience');
+  } finally { await app.close(); }
+  // 2. the server names a different audience than the one mapped: refused, PingOne never asked
+  const other = await fakeP1({ resource: 'someone-elses.example.demo' });
+  const a2 = await withMap(other, other.mcp);
+  try {
+    const id = (await a2.call('POST', '/api/connections', { transport: 'http', url: other.mcp })).json.connection.id;
+    const d = await a2.call('GET', `/api/connections/${id}/oauth`);
+    assert.equal(d.json.error, 'oauth_resource_mismatch'); assert.match(d.json.message, /MCPTOOLS_P1_RESOURCES/); assert.equal(other.st.authorize, undefined);
+  } finally { await a2.close(); }
+  // 3. the mapping belongs to another URL: this server cannot use it
+  const third = await fakeP1({ resource: 'banking.example.demo' });
+  const a3 = await withMap(third, 'http://127.0.0.1:1/mcp');
+  try {
+    const id = (await a3.call('POST', '/api/connections', { transport: 'http', url: third.mcp })).json.connection.id;
+    assert.equal((await a3.call('GET', `/api/connections/${id}/oauth`)).json.error, 'oauth_resource_mismatch'); assert.equal(third.st.authorize, undefined);
+  } finally { await a3.close(); }
+  // 4. mapped, but our PingOne does not know that resource (issues its own API audience): the token is refused as before
+  const unknown = await fakeP1({ resource: 'banking.example.demo', aud: 'https://api.pingone.example' });
+  const a4 = await withMap(unknown, unknown.mcp);
+  try {
+    const { done, id } = await signIn(a4, unknown);
+    assert.equal(done.json.error, 'oauth_audience_mismatch'); assert.equal((await a4.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, false); assert.equal(unknown.st.bearers?.length ?? 0, 0);
+  } finally { await a4.close(); }
+  // 5. a server that names its own URL is unaffected by an unrelated mapping
+  const plain = await fakeP1();
+  const a5 = await withMap(plain, 'http://127.0.0.1:1/mcp');
+  try { assert.equal((await signIn(a5, plain)).done.json.state, 'signed_in'); assert.equal(plain.st.authorize.resource, plain.mcp); } finally { await a5.close(); }
+});
+
+test('the mapping is exact: same origin with another path or query does not get it', T, async () => {
+  const w = await fakeP1({ resource: 'banking.example.demo' });
+  for (const suffix of ['/other', '?x=1']) { // the mapped key is <mcp>; <mcp>/other and <mcp>?x=1 are different URLs
+    const url = `${w.mcp}${suffix}`;
+    const app = await startApp({ env: { ...ENV, MCPTOOLS_P1_ISSUER: w.issuer, MCPTOOLS_P1_RESOURCES: `${w.mcp}=banking.example.demo` } });
+    try {
+      const id = (await app.call('POST', '/api/connections', { transport: 'http', url })).json.connection.id;
+      assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.error, 'oauth_resource_mismatch', suffix);
+    } finally { await app.close(); }
+  }
+  assert.equal(w.st.authorize, undefined, 'PingOne was never asked');
+});
+
+test('a refreshed token for a mapped (non-URL) audience is checked too', T, async () => {
+  const w = await fakeP1({ resource: 'banking.example.demo', aud: (r) => r, refreshAud: 'https://api.pingone.example' });
+  const app = await startApp({ env: { ...ENV, MCPTOOLS_P1_ISSUER: w.issuer, MCPTOOLS_P1_RESOURCES: `${w.mcp}=banking.example.demo` } });
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    const run = (await app.call('POST', `/api/connections/${id}/oauth/piflow`, {})).json;
+    assert.equal((await app.call('POST', `/api/connections/${id}/oauth/piflow/credentials`, { run: run.run, username: 'alice', password: PASSWORD })).json.state, 'signed_in');
+    await app.call('GET', `/api/connections/${id}/tools`); // 20 s lifetime: this call refreshes first
+    assert.ok(w.st.refreshReq); assert.equal(w.st.refreshReq.resource, 'banking.example.demo');
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, false);
+  } finally { await app.close(); }
+});
+
+test('the mapping never applies to a server that signs in with another authorization server', T, async () => {
+  const { world, closeAll } = await import('./fixtures/oauthWorld.js');
+  const w = await world({ resource: 'banking.example.demo' });
+  const app = await startApp({ env: { MCPTOOLS_P1_RESOURCES: `${w.mcp}=banking.example.demo` } });
+  try {
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+    const d = await app.call('GET', `/api/connections/${id}/oauth`);
+    assert.equal(d.json.error, 'oauth_resource_mismatch'); assert.doesNotMatch(d.json.message, /MCPTOOLS_P1_RESOURCES/);
+  } finally { await app.close(); await closeAll(); }
+});
+
+test('parseResourceMap: URL=audience pairs, last = splits, junk and Ping API audiences are skipped', () => {
+  const m = parseResourceMap('http://127.0.0.1:8081/mcp=mcp-invest.ping.demo, https://srv.example/mcp/=https://aud.example/x https://q.example/mcp?k=v=aud-q  bad  =x nourl=a http://h/=  ftp://f/mcp=aud https://api.pingone.com=https://api.pingone.com http://p/mcp=api.pingone.eu http://q/mcp=my-pingone.example');
+  assert.deepEqual([...m], [['http://127.0.0.1:8081/mcp', 'mcp-invest.ping.demo'], ['https://srv.example/mcp', 'https://aud.example/x'], ['https://q.example/mcp?k=v', 'aud-q']]);
+  assert.equal(parseResourceMap('http://a/mcp=https://api.pingone.com. http://b/mcp=api.pingone.com. http://c/mcp=api.pingone.com:443 http://d/mcp=urn:x:pingone http://e/mcp=pingone:api http://f/mcp=PINGONE').size, 0, 'Ping API audiences are dropped in every spelling');
+  assert.equal(parseResourceMap('').size, 0); assert.equal(parseResourceMap(undefined).size, 0);
+  assert.equal(parseResourceMap(`http://h/mcp=${'a'.repeat(201)}`).size, 0, 'an over-long audience is skipped');
 });

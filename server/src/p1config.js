@@ -8,7 +8,7 @@ import path from 'node:path';
 import { parseEnv } from 'node:util';
 
 const REGION_ALIASES = { na: 'com', us: 'com', com: 'com', eu: 'eu', ca: 'ca', ap: 'asia', asia: 'asia', au: 'asia' }; // as pingone-LAB settings.js
-export const P1_KEYS = ['PINGONE_ENVIRONMENT_ID', 'PINGONE_REGION', 'PINGONE_MCP_CLIENT_ID'];
+export const P1_KEYS = ['PINGONE_ENVIRONMENT_ID', 'PINGONE_REGION', 'PINGONE_MCP_CLIENT_ID', 'MCPTOOLS_P1_SCOPES', 'MCPTOOLS_P1_RESOURCES']; // the last two are settings, not secrets
 
 export function p1Config(env = process.env) {
   const environmentId = String(env.PINGONE_ENVIRONMENT_ID || '').trim();

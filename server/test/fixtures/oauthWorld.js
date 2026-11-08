@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 
 // A fake authorization server and a protected MCP server on loopback, shared by the OAuth tests. `opts` bends them:
-// wrongIssuer, noRegistration, asOverride, iss/noIss/issParameter, authEndpoint, lax (codes reusable), expiresIn, echo (the MCP server
+// resource (the resource the fake MCP server names), wrongIssuer, noRegistration, asOverride, iss/noIss/issParameter, authEndpoint, lax (codes reusable), expiresIn, echo (the MCP server
 // echoes the Bearer it got in tools/call).
 export const servers = [];
 export const listen = (handler) => new Promise((r) => { const s = http.createServer(handler); servers.push(s); s.listen(0, '127.0.0.1', () => r(`http://127.0.0.1:${s.address().port}`)); });
@@ -41,7 +41,7 @@ export async function world(opts = {}) {
   });
   mcpUrl = await listen(async (req, res) => {
     const u = new URL(req.url, 'http://x');
-    if (u.pathname === '/.well-known/oauth-protected-resource') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ resource: `${mcpUrl}/mcp`, authorization_servers: [opts.asOverride || as], scopes_supported: ['tools:read'] }));
+    if (u.pathname === '/.well-known/oauth-protected-resource') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ resource: opts.resource || `${mcpUrl}/mcp`, authorization_servers: [opts.asOverride || as], scopes_supported: ['tools:read'] }));
     const body = await readBody(req);
     const auth = req.headers.authorization || '';
     st.mcpAuth.push(auth);
