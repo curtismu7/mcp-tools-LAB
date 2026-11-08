@@ -21,6 +21,7 @@ rl.on('line', (line) => {
     send({ jsonrpc: '2.0', method: 'notifications/progress', params: { progressToken: 'p1', progress: 1, total: 2 } });
     return send({ jsonrpc: '2.0', id: 's-1', method: 'roots/list', params: {} });
   }
+  if (msg.method === 'tools/call' && msg.params?.name === 'leak') { send({ jsonrpc: '2.0', method: 'notifications/message', params: { level: 'info', data: `env:${process.env.STDIO_TEST_SECRET}` } }); return send({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: 'leaked' }] } }); }
   if (msg.method === 'tools/call' && msg.params?.name === 'seen') return send({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: notes.join(',') }] } });
   if (msg.method === 'initialize') return send({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2025-06-18', serverInfo: { name: 'stdio-fake', version: '1', envKeys: Object.keys(process.env).sort() }, capabilities: { tools: {} } } });
   if (msg.method === 'tools/list') return send({ jsonrpc: '2.0', id: msg.id, result: { tools: [{ name: 'echo', description: 'Echo input.', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } }] } });

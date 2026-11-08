@@ -39,6 +39,9 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
   const inflight = new Set(); // AbortControllers of passthrough requests still open
 
   const closeAll = () => { for (const ac of inflight) ac.abort(new Error('the proxy was turned off')); inflight.clear(); };
+  // A deleted connection: its open streams end, and anything the proxy kept for it is dropped.
+  const closeRoute = (id) => { for (const ac of [...inflight]) if (ac.route === id) { ac.abort(new Error('the connection was removed')); inflight.delete(ac); } serverAsked.delete(id); };
+  const serverAsked = new Map(); // route -> ids of requests the stdio server sent on its own (only these may be answered)
   function setEnabled(on) {
     state.enabled = Boolean(on);
     state.token = on ? crypto.randomBytes(24).toString('base64url') : null;
@@ -98,6 +101,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
     const target = resolve(req.params.id);
     if (target.status) return res.status(target.status).json({ error: target.error, message: target.message });
     const reqText = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
+    if (target.conn) await oauth?.fresh(target.conn.id); // a refresh mints a new token: it must be in `secrets` before anything is logged
     const secrets = [state.token, ...(target.conn ? secretsFor(target.conn) : [])];
     const reqBody = captureBody(reqText, { secrets, contentType: req.headers['content-type'] });
     const conn = target.conn;
@@ -131,11 +135,12 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
   async function passthrough({ req, res, conn, reqText, secrets, flow, started, done }) {
     const headers = {};
     for (const k of ['content-type', 'accept', 'mcp-session-id', 'mcp-protocol-version', 'last-event-id']) if (req.headers[k]) headers[k] = req.headers[k];
-    await oauth?.fresh(conn.id);
+    // (handle() already refreshed, before it collected the secrets to scrub: a second refresh here would mint a token it never saw.)
     const signedIn = oauth?.auth(conn.id); // a third-party OAuth sign-in wins over a saved token
     if (signedIn) headers[signedIn[0]] = signedIn[1];
     else if (conn.token) headers[conn.authHeader || 'Authorization'] = conn.token;
     const ac = new AbortController();
+    ac.route = conn.id;
     inflight.add(ac);
     res.on('close', () => { ac.abort(); inflight.delete(ac); });
     const timer = setTimeout(() => ac.abort(new Error(`upstream sent no response headers in ${headerTimeoutMs / 1000}s`)), headerTimeoutMs);
@@ -200,18 +205,24 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
     if (req.method !== 'POST') { res.status(405).set('Allow', 'POST, DELETE').json({ error: 'method_not_allowed', message: 'This route is bridged: POST JSON-RPC only (no server-sent stream for this transport).' }); return done(405, null); }
     let msg = null; // the request as sent (the flow log holds a scrubbed, capped copy; never forward that)
     try { msg = JSON.parse(reqText); } catch { msg = null; }
-    // A client's answer to a server request (stdio only): written to the server as sent.
-    if (streams && isObject(msg) && msg.jsonrpc === '2.0' && msg.method === undefined && msg.id !== undefined && ('result' in msg || 'error' in msg)) {
-      await client.send(msg); res.status(202).end(); return done(202, null);
-    }
     const reply = (status, payload) => {
       const text = JSON.stringify(scrubJson(payload, secrets)); // a bridged server's echo of a secret is scrubbed too
       res.status(status).type('application/json').send(text);
       done(status, { headers: { 'content-type': 'application/json' }, body: captureBody(text, { secrets, contentType: 'application/json' }) });
     };
+    // A client's answer to a request the stdio server sent on its own: only an id the server really issued, and only
+    // the JSON-RPC fields of a response (nothing else the client put in the body reaches the server).
+    if (streams && isObject(msg) && msg.jsonrpc === '2.0' && msg.method === undefined && msg.id !== undefined && ('result' in msg || 'error' in msg)) {
+      const asked = serverAsked.get(req.params.id);
+      if (!asked?.has(msg.id)) return reply(400, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'no such request from the server: only answers to requests the server sent are forwarded' } });
+      asked.delete(msg.id);
+      await client.send({ jsonrpc: '2.0', id: msg.id, ...('result' in msg ? { result: msg.result } : { error: msg.error }) });
+      res.status(202).end(); return done(202, null);
+    }
     if (!isObject(msg) || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return reply(400, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'one JSON-RPC 2.0 message per POST (batches are not supported on a bridged route)' } });
     if (msg.id === undefined) { // a notification: stdio gets it (this tool already sent its own initialized)
-      if (streams && msg.method !== 'notifications/initialized') await client.send(msg);
+      if (streams && !/^notifications\//.test(msg.method)) return reply(400, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'only notifications/* may be sent without an id' } });
+      if (streams && msg.method !== 'notifications/initialized') await client.send({ jsonrpc: '2.0', method: msg.method, ...(isObject(msg.params) ? { params: msg.params } : {}) });
       res.status(202).end(); return done(202, null);
     }
     try {
@@ -229,6 +240,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
   async function aggregate(req, res) {
     const list = members();
     const targets = list.map((m) => ({ m, target: resolve(m.id) })).filter((x) => !x.target.status);
+    await Promise.all(targets.map((x) => (x.target.conn ? oauth?.fresh(x.target.conn.id) : null)));
     const secrets = [state.token, ...targets.flatMap((x) => (x.target.conn ? secretsFor(x.target.conn) : []))];
     const reqText = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
     const reqBody = captureBody(reqText, { secrets, contentType: req.headers['content-type'] });
@@ -293,6 +305,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
     done(200, { headers: { 'content-type': 'text/event-stream' }, body: { bytes: 0, truncated: false, tokens: 0 } });
     const label = clip(target.conn?.label ?? req.params.id, 80);
     const unsubscribe = client.subscribe((raw) => {
+      if (raw.method && raw.id !== undefined) { if (!serverAsked.has(req.params.id)) serverAsked.set(req.params.id, new Set()); const s = serverAsked.get(req.params.id); if (s.size < 100) s.add(raw.id); } // a request the client may answer
       const msg = scrubJson(raw, secrets);
       const text = JSON.stringify(msg);
       res.write(`event: message\ndata: ${text}\n\n`);
@@ -303,7 +316,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
         response: { headers: { 'content-type': 'text/event-stream' }, body: captureBody(text, { secrets, contentType: 'application/json' }) }, error: null,
       });
     });
-    const handle = { abort() { unsubscribe(); res.end(); } };
+    const handle = { route: req.params.id, abort() { unsubscribe(); res.end(); } };
     inflight.add(handle);
     res.on('close', () => { unsubscribe(); inflight.delete(handle); });
   }
@@ -334,5 +347,6 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oau
     reset() { setEnabled(false); flows.clear(); fixtureClients.clear(); },
     // A Mock/Real switch: the flow log is emptied and open streams are closed; the proxy stays on with the same token.
     modeChanged() { closeAll(); flows.clear(); },
+    closeRoute,
   };
 }

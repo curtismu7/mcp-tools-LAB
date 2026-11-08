@@ -73,6 +73,7 @@ export function createStdioClient({ command, args = [], env = {}, timeoutMs = 30
     // For the live proxy's stdio stream. subscribe(fn) returns the unsubscribe function; send(msg) writes one message
     // as is (a client's answer to a server request, or a client notification).
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    listenerCount: () => listeners.size,
     async send(msg) { await ensure(); child.stdin.write(`${JSON.stringify(msg)}\n`); },
     async close() { ready = null; child?.kill(); child = null; },
   };

@@ -28,7 +28,7 @@ export class OAuthError extends Error { constructor(message, code = 'oauth_error
 
 // Ping-hosted authorization servers must use pi.flow (rule 16), so the redirect flow refuses them. Host names only.
 export function isPingHost(host) {
-  const h = String(host || '').toLowerCase();
+  const h = String(host || '').toLowerCase().replace(/\.+$/, ''); // a trailing dot is the same host
   return /(^|\.)(pingone\.[a-z.]+|pingidentity\.com|ping-devops\.com|pingone\.com)$/.test(h) || /(^|[.-])pingone([.-]|$)|pingfederate/.test(h);
 }
 
@@ -45,7 +45,13 @@ async function getJson(url, { method = 'GET', body, headers = {} } = {}) {
   try {
     res = await fetch(url, { method, body, headers: { Accept: 'application/json', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) });
   } catch (err) { throw new OAuthError(`${new URL(url).origin} unreachable (${err?.cause?.code || err?.name || 'network error'})`, 'oauth_unreachable'); }
-  const text = (await res.text()).slice(0, MAX_BYTES);
+  // Read at most MAX_BYTES: a server that sends more is cut off, never buffered whole.
+  let text = '';
+  if (res.body) {
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let n = 0;
+    try { for (;;) { const { done, value } = await reader.read(); if (done) break; n += value.length; text += dec.decode(value, { stream: true }); if (n >= MAX_BYTES) break; } } finally { reader.cancel().catch(() => {}); }
+  }
+  text = text.slice(0, MAX_BYTES);
   let json = null;
   try { json = JSON.parse(text); } catch { json = null; }
   return { status: res.status, json, headers: res.headers };
@@ -58,7 +64,7 @@ export function parseChallenge(header) {
   return out;
 }
 
-export function createOAuth({ env = {} } = {}) {
+export function createOAuth({ env = {}, now = Date.now } = {}) {
   const p1 = p1Config(env);
   const piflow = createPiFlow();
   const sessions = new Map(); // connection id -> { issuer, clientId, clientSecret, accessToken, refreshToken, expiresAt, scope, tokenEndpoint, resource }
@@ -103,11 +109,17 @@ export function createOAuth({ env = {} } = {}) {
     if (!meta) throw new OAuthError('the authorization server publishes no metadata', 'oauth_no_metadata');
     if (String(meta.issuer || '').replace(/\/$/, '') !== issuer.toString().replace(/\/$/, '')) throw new OAuthError('the authorization server metadata names a different issuer', 'oauth_issuer_mismatch');
     if (Array.isArray(meta.code_challenge_methods_supported) && !meta.code_challenge_methods_supported.includes('S256')) throw new OAuthError('the authorization server does not support PKCE S256', 'oauth_no_pkce');
+    const endpoint = (v, what) => {
+      const u = checkedUrl(v, what);
+      // Every endpoint, not only the issuer: a non-Ping issuer must not front a Ping endpoint (pi.flow only for Ping).
+      if (!ours && isPingHost(u.hostname)) throw new OAuthError(`${what} is on a Ping host. Ping sign-in is pi.flow only (rule 16), so this tool will not open a redirect sign-in for it.`, 'oauth_ping_refused');
+      return u.toString();
+    };
     const info = {
       required: true, issuer: meta.issuer, method: ours ? 'piflow' : 'redirect',
-      authorizationEndpoint: checkedUrl(meta.authorization_endpoint, 'the authorization endpoint').toString(),
-      tokenEndpoint: checkedUrl(meta.token_endpoint, 'the token endpoint').toString(),
-      registrationEndpoint: meta.registration_endpoint ? checkedUrl(meta.registration_endpoint, 'the registration endpoint').toString() : null,
+      authorizationEndpoint: endpoint(meta.authorization_endpoint, 'the authorization endpoint'),
+      tokenEndpoint: endpoint(meta.token_endpoint, 'the token endpoint'),
+      registrationEndpoint: meta.registration_endpoint ? endpoint(meta.registration_endpoint, 'the registration endpoint') : null,
       resource: typeof prm.resource === 'string' ? prm.resource : server.toString(),
       scopes: (challenge.scope ? challenge.scope.split(' ') : Array.isArray(prm.scopes_supported) ? prm.scopes_supported : []).filter(Boolean).slice(0, 30),
       issParameter: meta.authorization_response_iss_parameter_supported === true,
@@ -128,10 +140,10 @@ export function createOAuth({ env = {} } = {}) {
       if (!(r.status === 201 || r.status === 200) || typeof r.json?.client_id !== 'string') throw new OAuthError(`client registration failed (HTTP ${r.status})`, 'oauth_registration_failed');
       id = r.json.client_id; secret = typeof r.json.client_secret === 'string' ? r.json.client_secret : null;
     }
-    for (const [s, p] of pending) if (Date.now() - p.at > STATE_TTL_MS || p.connectionId === conn.id) pending.delete(s); // one sign-in per connection
+    for (const [s, p] of pending) if (now() - p.at > STATE_TTL_MS || p.connectionId === conn.id) pending.delete(s); // one sign-in per connection
     const state = b64url(crypto.randomBytes(24));
     const verifier = b64url(crypto.randomBytes(32));
-    pending.set(state, { connectionId: conn.id, verifier, redirectUri, issuer: info.issuer, clientId: id, clientSecret: secret, tokenEndpoint: info.tokenEndpoint, resource: info.resource, scope: info.scopes.join(' '), at: Date.now() });
+    pending.set(state, { connectionId: conn.id, issParameter: info.issParameter, verifier, redirectUri, issuer: info.issuer, clientId: id, clientSecret: secret, tokenEndpoint: info.tokenEndpoint, resource: info.resource, scope: info.scopes.join(' '), at: now() });
     const url = new URL(info.authorizationEndpoint);
     url.search = new URLSearchParams({ response_type: 'code', client_id: id, redirect_uri: redirectUri, state, code_challenge: b64url(crypto.createHash('sha256').update(verifier).digest()), code_challenge_method: 'S256', resource: info.resource, ...(info.scopes.length ? { scope: info.scopes.join(' ') } : {}) }).toString();
     return { authorizeUrl: url.toString(), issuer: info.issuer, scopes: info.scopes, registration: clientId ? 'manual' : 'dynamic' };
@@ -148,8 +160,10 @@ export function createOAuth({ env = {} } = {}) {
   async function callback({ code, state, error, iss }) {
     const p = typeof state === 'string' ? pending.get(state) : null;
     if (p) pending.delete(state);
-    if (!p || Date.now() - p.at > STATE_TTL_MS) throw new OAuthError('unknown or expired sign-in (state); start again from the Server page', 'oauth_bad_state');
+    if (!p || now() - p.at > STATE_TTL_MS) throw new OAuthError('unknown or expired sign-in (state); start again from the Server page', 'oauth_bad_state');
     if (error) throw new OAuthError(`the authorization server refused: ${String(error).slice(0, 80)}`, 'oauth_denied');
+    if (Array.isArray(iss)) throw new OAuthError('the callback carries more than one iss', 'oauth_issuer_mismatch');
+    if (iss === undefined && p.issParameter) throw new OAuthError('the authorization server says it sends iss, but the callback has none', 'oauth_issuer_mismatch');
     if (iss !== undefined && String(iss).replace(/\/$/, '') !== String(p.issuer).replace(/\/$/, '')) throw new OAuthError('the callback came from a different issuer (iss)', 'oauth_issuer_mismatch');
     if (typeof code !== 'string' || !code) throw new OAuthError('no code in the callback', 'oauth_no_code');
     const t = await tokenRequest(p, { grant_type: 'authorization_code', code, redirect_uri: p.redirectUri, code_verifier: p.verifier });
@@ -158,9 +172,16 @@ export function createOAuth({ env = {} } = {}) {
   }
 
   // Refreshes a token that is about to expire. A failed refresh signs the connection out (the operator signs in again).
+  const refreshing = new Map(); // connection id -> the refresh in flight (one per connection: a rotating refresh token is used once)
   async function fresh(connectionId) {
     const s = sessions.get(connectionId);
     if (!s || s.expiresAt - Date.now() > 30_000) return;
+    if (refreshing.has(connectionId)) return refreshing.get(connectionId);
+    const p = refresh(connectionId, s).finally(() => refreshing.delete(connectionId));
+    refreshing.set(connectionId, p);
+    return p;
+  }
+  async function refresh(connectionId, s) {
     if (!s.refreshToken) { sessions.delete(connectionId); return; }
     try {
       const t = await tokenRequest(s, { grant_type: 'refresh_token', refresh_token: s.refreshToken });

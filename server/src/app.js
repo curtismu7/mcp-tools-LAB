@@ -149,6 +149,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     inputs.removeFor(req.params.id);
     oauth.signOut(req.params.id);
     flags.removeFor(req.params.id);
+    liveProxy.closeRoute(req.params.id);
     res.status(204).end();
   }));
 
@@ -262,7 +263,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   const page = (title, text) => `<!doctype html><html lang="en"><meta charset="utf-8"><title>${title}</title><body><h1>${title}</h1><p>${String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</p></body></html>`;
   api.get('/oauth/callback', wrap(async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    const q = Object.fromEntries(Object.entries(req.query).filter(([, v]) => typeof v === 'string'));
+    const q = Object.fromEntries(Object.entries(req.query).filter(([k, v]) => typeof v === 'string' || (k === 'iss' && Array.isArray(v))));
     if (mock) return res.status(403).type('html').send(page('Not available', 'This copy is mock only.'));
     try {
       await oauth.callback(q);
@@ -398,5 +399,6 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(WEB_DIST, 'index.html')));
   }
   app.locals.manager = manager;
+  app.locals.oauth = oauth; // tests read what the sign-in store holds
   return app;
 }
