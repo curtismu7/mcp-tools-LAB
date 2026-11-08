@@ -71,7 +71,7 @@
       "url": "http://127.0.0.1:9900/mcp",
       "authHeader": "Authorization",
       "note": "Nine OpenSearch tools (list indices, search, count, cluster health). Runs in the SE cluster; this tunnel makes it reachable on loopback.",
-      "start": "kubectl --context us -n ping-devops-cmuir port-forward svc/opensearch-mcp-server 9900:9900"
+      "start": "kubectl --context <cluster> -n <namespace> port-forward svc/opensearch-mcp-server 9900:9900"
     },
     {
       "id": "jwt-verifier",
