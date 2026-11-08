@@ -14,7 +14,9 @@ const readBody = (req) => new Promise((r) => { let b = ''; req.on('data', (c) =>
 const b64url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const PASSWORD = 'Pa55-word-never-logged';
 
-async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read'], scopeChallenge, wrongState = false, omitState = false, otp = false } = {}) {
+// aud: the audience put in the access token (default: the resource asked for, as a PingOne that knows it; 'opaque' = a non-JWT token;
+// a function gets the resource). refreshAud: same for a refreshed token (turns on refresh_token and a 20 s lifetime).
+async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read'], scopeChallenge, wrongState = false, omitState = false, otp = false, aud, refreshAud } = {}) {
   const st = { flows: new Map(), codes: new Map(), tokens: new Set(), seen: [] };
   let base;
   const p1 = await listen(async (req, res) => {
@@ -49,10 +51,21 @@ async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read
     }
     if (u.pathname === `${env}/as/token`) {
       const p = Object.fromEntries(new URLSearchParams(await readBody(req))); st.tokenReq = p;
+      const mint = (want) => {
+        if (want === 'opaque') return `p1-access-${crypto.randomUUID()}`;
+        const claims = { iss: `${base}${env}/as`, aud: typeof want === 'function' ? want(p.resource) : want === undefined ? p.resource : want, scope: 'openid' };
+        return `p1-access-${crypto.randomUUID()}.${b64url(Buffer.from(JSON.stringify(claims)))}.sig`;
+      };
+      if (p.grant_type === 'refresh_token') {
+        st.refreshReq = p;
+        if (p.refresh_token !== 'p1-refresh-1') return json(400, { error: 'invalid_grant' });
+        const t = mint(refreshAud); st.tokens.add(t);
+        return json(200, { access_token: t, token_type: 'Bearer', expires_in: 20, refresh_token: 'p1-refresh-1' });
+      }
       const a = st.codes.get(p.code); st.codes.delete(p.code);
       if (!a || b64url(crypto.createHash('sha256').update(p.code_verifier || '').digest()) !== a.code_challenge || p.client_id !== 'p1-mcp-client') return json(400, { error: 'invalid_grant' });
-      const t = `p1-access-${crypto.randomUUID()}`; st.tokens.add(t);
-      return json(200, { access_token: t, token_type: 'Bearer', expires_in: 3600 });
+      const t = mint(aud); st.tokens.add(t);
+      return json(200, { access_token: t, token_type: 'Bearer', expires_in: refreshAud !== undefined ? 20 : 3600, ...(refreshAud !== undefined ? { refresh_token: 'p1-refresh-1' } : {}) });
     }
     res.writeHead(404).end();
   });
@@ -62,6 +75,7 @@ async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/.well-known/oauth-protected-resource') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ resource: resource || `${mcpBase}/mcp`, authorization_servers: [`${base}/env-1/as`], scopes_supported: scopes }));
     const body = await readBody(req);
+    if (req.headers.authorization) (st.bearers ||= []).push(req.headers.authorization);
     if (!st.tokens.has(String(req.headers.authorization || '').replace(/^Bearer /, ''))) return res.writeHead(401, { 'www-authenticate': `Bearer resource_metadata="${mcpBase}/.well-known/oauth-protected-resource"` }).end();
     const msg = JSON.parse(body || '{}');
     if (msg.id === undefined) return res.writeHead(202).end();
@@ -72,6 +86,7 @@ async function fakeP1({ identifierFirst = false, resource, scopes = ['tools:read
 }
 
 import { createPiFlow } from '../src/piflow.js';
+import { checkAudience } from '../src/oauth.js';
 import { loadSharedP1, p1Config } from '../src/p1config.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -235,4 +250,90 @@ test('startup copies only the three PingOne keys from the shared settings file, 
   assert.equal(p1Config({ ...env, MCPTOOLS_P1_ISSUER: 'http://127.0.0.1:9/env/as' }).issuer, 'http://127.0.0.1:9/env/as');
   assert.equal(p1Config({ ...env, MCPTOOLS_P1_ISSUER: 'https://id.example.test/env/as' }).issuer, 'https://id.example.test/env/as');
   fs.rmSync(dir, { recursive: true });
+});
+
+// Our PingOne ignores a resource it does not know and issues its own API audience (measured live 2026-11-08). The tool must
+// not keep such a token or send it to the server that asked for the sign-in.
+async function signInWith(opts) {
+  const w = await fakeP1(opts);
+  const app = await startApp({ env: { MCPTOOLS_P1_ISSUER: w.issuer, PINGONE_MCP_CLIENT_ID: 'p1-mcp-client' } });
+  const id = (await app.call('POST', '/api/connections', { transport: 'http', url: w.mcp })).json.connection.id;
+  const run = (await app.call('POST', `/api/connections/${id}/oauth/piflow`, {})).json;
+  const done = await app.call('POST', `/api/connections/${id}/oauth/piflow/credentials`, { run: run.run, username: 'alice', password: PASSWORD });
+  return { w, app, id, done };
+}
+
+test('a token for another audience (PingOne API) is refused: not kept, not sent, and the message says what to do', T, async () => {
+  const { w, app, id, done } = await signInWith({ aud: 'https://api.pingone.example' });
+  try {
+    assert.equal(done.status, 400); assert.equal(done.json.error, 'oauth_audience_mismatch');
+    assert.match(done.json.message, /api\.pingone\.example/); assert.match(done.json.message, /resource in the PingOne environment/);
+    assert.ok(!/p1-access-/.test(done.text) && !done.text.includes(PASSWORD), 'neither the token nor the password is echoed');
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, false);
+    await app.call('GET', `/api/connections/${id}/tools`);
+    assert.equal(w.st.bearers?.length ?? 0, 0, 'the server never received that token');
+  } finally { await app.close(); }
+});
+
+test('an opaque token cannot be checked, so it is refused too', T, async () => {
+  const { app, id, done } = await signInWith({ aud: 'opaque' });
+  try {
+    assert.equal(done.json.error, 'oauth_audience_mismatch'); assert.match(done.json.message, /none readable/);
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, false);
+  } finally { await app.close(); }
+});
+
+test('an audience that is only the server (a one-item list, or the URL with a trailing slash) is accepted', T, async () => {
+  for (const aud of [(r) => [r], (r) => `${r}/`]) {
+    const { w, app, id, done } = await signInWith({ aud });
+    try {
+      assert.equal(done.json.state, 'signed_in');
+      assert.equal((await app.call('GET', `/api/connections/${id}/tools`)).json.tools[0].name, 'p1_tool');
+      assert.ok(w.st.bearers.length > 0);
+    } finally { await app.close(); }
+  }
+});
+
+test('checkAudience: exact server URL only (no prefix, suffix, other host or non-string audience)', () => {
+  const jwt = (aud) => `h.${Buffer.from(JSON.stringify({ aud })).toString('base64url')}.s`;
+  const R = 'http://127.0.0.1:4821/mcp';
+  for (const ok of [R, `${R}/`, [R], [R, `${R}/`]]) assert.doesNotThrow(() => checkAudience(jwt(ok), R));
+  for (const bad of [['x', R], [R, 'https://api.pingone.com'], ['https://api.pingone.com', R], [R, 1], `${R}/more`, 'http://127.0.0.1:4821', `${R}x`, 'http://127.0.0.1:4822/mcp', 'https://api.pingone.com', [], [1, null], null, undefined, { a: R }]) {
+    assert.throws(() => checkAudience(jwt(bad), R), (e) => e.code === 'oauth_audience_mismatch', JSON.stringify(bad));
+  }
+  for (const junk of ['', 'not-a-jwt', 'a.b.c', 'a..c', `a.${Buffer.from('[1]').toString('base64url')}.c`]) assert.throws(() => checkAudience(junk, R), (e) => e.code === 'oauth_audience_mismatch');
+});
+
+test('a refreshed token is checked too: a wrong audience signs the connection out and is never sent', T, async () => {
+  const { w, app, id, done } = await signInWith({ refreshAud: 'https://api.pingone.example' });
+  try {
+    assert.equal(done.json.state, 'signed_in'); // the first token names the server
+    await app.call('GET', `/api/connections/${id}/tools`); // 20 s lifetime: this call refreshes first
+    assert.ok(w.st.refreshReq, 'a refresh was attempted');
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, false);
+    assert.ok(!(w.st.bearers || []).some((b) => /\.[A-Za-z0-9_-]+\.sig$/.test(b) && Buffer.from(b.split('.')[1], 'base64url').toString().includes('api.pingone.example')), 'the wrong-audience token never reached the server');
+  } finally { await app.close(); }
+});
+
+test('a refreshed token for the right audience keeps the sign-in', T, async () => {
+  const { w, app, id } = await signInWith({ refreshAud: (r) => r });
+  try {
+    await app.call('GET', `/api/connections/${id}/tools`);
+    assert.ok(w.st.refreshReq);
+    assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, true);
+  } finally { await app.close(); }
+});
+
+test("a list that also names PingOne's API is refused (it would work there), the message hides the URL query, and a long slash run stays fast", T, async () => {
+  const { w, app, id, done } = await signInWith({ aud: (r) => [r, 'https://api.pingone.example'] });
+  try {
+    assert.equal(done.json.error, 'oauth_audience_mismatch'); assert.equal((await app.call('GET', `/api/connections/${id}/oauth`)).json.signedIn, false);
+    assert.equal(w.st.bearers?.length ?? 0, 0);
+  } finally { await app.close(); }
+  const jwt = (aud) => `h.${Buffer.from(JSON.stringify({ aud })).toString('base64url')}.s`;
+  const msgOf = (aud, res) => { try { checkAudience(jwt(aud), res); } catch (e) { return e.message; } return ''; };
+  const msg = msgOf('https://api.pingone.example', `https://srv.example/mcp?key=${'S'.repeat(30)}END#frag`);
+  assert.match(msg, /srv\.example\/mcp/); assert.ok(!/SSS|key=|frag|END/.test(msg), 'no query or fragment in the message');
+  const t0 = Date.now(); assert.throws(() => checkAudience(jwt(`${'/'.repeat(60_000)}x`), 'http://127.0.0.1:1/mcp')); assert.ok(Date.now() - t0 < 500, 'linear time');
+  assert.doesNotMatch(msgOf('bad\n<script>‮', 'http://127.0.0.1:1/mcp'), /[^\x20-\x7e]/, 'printable ASCII only');
 });
