@@ -9,3 +9,4 @@ export const get = (p) => api('GET', p);
 export const post = (p, b) => api('POST', p, b ?? {});
 export const del = (p) => api('DELETE', p);
 export const pretty = (v) => JSON.stringify(v, null, 2);
+export const put = (p, b) => api('PUT', p, b ?? {});

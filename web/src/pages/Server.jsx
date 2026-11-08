@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { get, post, pretty } from "../lib/api.js";
+import { del, get, post, pretty, put } from "../lib/api.js";
+import { buildBrief, downloadBrief } from "../lib/brief.js";
+import FlagControl from "../components/FlagControl.jsx";
 import { Untrusted, spansFor } from "../lib/Untrusted.jsx";
 import CallPanel from "../components/CallPanel.jsx";
 import ConfirmCall from "../components/ConfirmCall.jsx";
 import ScanResult, { SeverityBadge, downloadReport, worst } from "../components/ScanResult.jsx";
+import { estimateTokens, TOKEN_NOTE } from "../lib/tokens.js";
 
 // One connected server: Tools / Resources / Prompts, the Scan button, the scan result, then the call panel. The scan
 // result lives in App (scans[id]) so it survives moving between pages in this session.
@@ -19,7 +22,7 @@ function fieldText(tool, field) {
   return typeof v === "string" ? v : null;
 }
 
-export default function Server({ conn, scan, onScanned, onMissing }) {
+export default function Server({ conn, scan, onScanned, onMissing, mockOnly = false }) {
   const [tab, setTab] = useState("tools");
   const [tools, setTools] = useState(scan?.listed.tools || null);
   const [others, setOthers] = useState(scan ? { resources: scan.listed.resources, prompts: scan.listed.prompts } : null);
@@ -32,6 +35,23 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
   const [methods, setMethods] = useState([]);
   const seen = useRef(new Map()); // name -> signature of the list last shown
   const base = `/api/connections/${encodeURIComponent(conn?.id || "")}`;
+  const [flags, setFlags] = useState([]);
+  const [flagErr, setFlagErr] = useState("");
+  const [briefNote, setBriefNote] = useState("");
+  const loadFlags = useCallback(async () => { const r = await get(`${base}/flags`); setFlags(r.ok ? r.data.flags || [] : []); }, [base]);
+  useEffect(() => { if (conn) loadFlags(); }, [conn?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flagOf = useCallback((kind, name) => flags.find((f) => f.kind === kind && f.name === name) || null, [flags]);
+  async function saveFlag(kind, name, note) {
+    setFlagErr("");
+    const r = await put(`${base}/flags`, { kind, name, note });
+    if (!r.ok) { setFlagErr(r.data?.message || `Could not save the flag (${r.status}).`); return false; }
+    loadFlags(); return true;
+  }
+  async function removeFlag(flag) { await del(`${base}/flags/${encodeURIComponent(flag.id)}`); loadFlags(); }
+  const flagProps = { onSave: saveFlag, onRemove: removeFlag, disabled: mockOnly };
+  const [pick, setPick] = useState(null); // a Run button's tool, handed to the call panel
+  const callRef = useRef(null);
+  const run = (name) => { setPick({ name, at: Date.now() }); callRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }); };
 
   const remember = useCallback((list) => { seen.current = new Map((list || []).map((t) => [t.name, sigOf(t)])); }, []);
   // Compare a new list with the one last shown; a tool whose text changed is the rug-pull signal.
@@ -144,18 +164,23 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
           <>
             {!tools && !err && <p className="muted">Listing...</p>}
             {tools && tools.length === 0 && <p className="muted">The server lists no tools.</p>}
+            {tools && tools.length > 0 && <p className="small muted" data-testid="list-tokens">This list costs an agent ~{estimateTokens({ tools })} tokens of context before it calls anything ({TOKEN_NOTE}).</p>}
             {tools && (
               <ul className="tool-list">
                 {tools.map((t, i) => {
                   const w = flaggedBy(t.name);
                   return (
                     <li key={`${t.name}-${i}`} className="tool">
-                      <strong><Untrusted text={t.name} spans={spansFor(findings, t.name, "name")} /></strong> {w && <SeverityBadge severity={w} />}
+                      <strong><Untrusted text={t.name} spans={spansFor(findings, t.name, "name")} /></strong> {w && <SeverityBadge severity={w} />} <span className="tok" data-testid="tool-tokens">~{estimateTokens(t)} tokens</span>
                       <div className="small"><Untrusted text={t.description || ""} spans={spansFor(findings, t.name, "description")} /></div>
                       <details>
                         <summary className="small">Input schema (shown as text)</summary>
                         <Untrusted block text={pretty(t.inputSchema ?? null)} />
                       </details>
+                      <div className="flag-row">
+                        <button type="button" className="btn" onClick={() => run(t.name)} aria-label={`Run ${t.name}`}>Run</button>
+                      </div>
+                      <FlagControl kind="tool" name={t.name} flag={flagOf("tool", t.name)} {...flagProps} />
                     </li>
                   );
                 })}
@@ -163,16 +188,32 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
             )}
           </>
         )}
-        {tab === "resources" && <Others items={others?.resources} kind="resource" idKey="uri" findings={findings} />}
-        {tab === "prompts" && <Others items={others?.prompts} kind="prompt" idKey="name" findings={findings} />}
+        {flagErr && <p className="alert" role="alert">{flagErr}</p>}
+        {tab === "resources" && <Others items={others?.resources} kind="resource" idKey="uri" findings={findings} flagOf={flagOf} flagProps={flagProps} />}
+        {tab === "prompts" && <Others items={others?.prompts} kind="prompt" idKey="name" findings={findings} flagOf={flagOf} flagProps={flagProps} />}
       </div>
 
       <h3>Scan result</h3>
       {report ? <ScanResult report={report} resolve={resolve} onDownload={() => downloadReport(report)} /> : <p className="muted">No scan yet. Press Scan to judge the metadata above.</p>}
 
-      <h3>Call a tool</h3>
+      <h3>Review brief</h3>
+      <div className="card" data-testid="brief">
+        <p className="small">Flag tools, resources or prompts above with a note, then download a Markdown brief for a coding agent or a reviewer: your notes, the server's definitions and the scan findings. Server text sits in fenced blocks marked as untrusted data, so the brief does not pass the poison on. {flags.length} flagged{flags.length ? "" : ": with nothing flagged the brief still lists every scan finding"}{report ? "" : ". Scan first to include findings"}.</p>
+        <div className="controls">
+          <button type="button" className="btn" onClick={() => setBriefNote(`Downloaded ${downloadBrief(buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags }), conn.label)}.`)}>Download review brief (Markdown)</button>
+          {briefNote && <span className="small" role="status">{briefNote}</span>}
+        </div>
+        {(flags.length > 0 || report) && (
+          <details>
+            <summary className="small">Preview the brief</summary>
+            <Untrusted block text={buildBrief({ conn, listed: { tools: tools || [], resources: others?.resources || [], prompts: others?.prompts || [] }, report, flags })} />
+          </details>
+        )}
+      </div>
+
+      <h3 ref={callRef} tabIndex={-1}>Call a tool</h3>
       <div className="card">
-        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} />
+        <CallPanel connectionId={conn.id} tools={tools} scanned={!!scan} flaggedBy={flaggedBy} onScan={runScan} scanning={scanning} pick={pick} />
       </div>
 
       <details className="card" data-admin-only>
@@ -183,24 +224,28 @@ export default function Server({ conn, scan, onScanned, onMissing }) {
   );
 }
 
-function Others({ items, kind, idKey, findings }) {
+function Others({ items, kind, idKey, findings, flagOf, flagProps }) {
   if (!items) return <p className="muted">Listing...</p>;
   if (items.length === 0) return <p className="muted">The server lists no {kind}s.</p>;
   return (
+    <>
+    <p className="small muted">These {kind}s cost ~{estimateTokens(items)} tokens to list ({TOKEN_NOTE}).</p>
     <ul className="tool-list">
       {items.map((it, i) => {
         const subject = `${kind}:${it[idKey] ?? it.name}`;
         const w = worst(findings.filter((f) => f.subject === subject));
         return (
           <li key={i} className="tool">
-            <strong><Untrusted text={it.name || it.uri} /></strong> {w && <SeverityBadge severity={w} />}
+            <strong><Untrusted text={it.name || it.uri} /></strong> {w && <SeverityBadge severity={w} />} <span className="tok">~{estimateTokens(it)} tokens</span>
             {it.uri && it.name && <div className="small muted"><Untrusted text={it.uri} /></div>}
             <div className="small"><Untrusted text={it.description || ""} /></div>
             {Array.isArray(it.arguments) && it.arguments.length > 0 && <div className="small muted">Arguments: <Untrusted text={it.arguments.map((a) => a?.name).join(", ")} /></div>}
+            {typeof (it[idKey] ?? it.name) === "string" && <FlagControl kind={kind} name={it[idKey] ?? it.name} flag={flagOf(kind, it[idKey] ?? it.name)} {...flagProps} />}
           </li>
         );
       })}
     </ul>
+    </>
   );
 }
 

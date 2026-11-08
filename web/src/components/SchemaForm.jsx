@@ -14,6 +14,19 @@ export function fieldsOf(schema) {
   return Object.entries(props).slice(0, MAX_FIELDS).map(([name, p]) => ({ name, p: p && typeof p === "object" ? p : {}, required: required.includes(name) }));
 }
 
+/** The inverse of buildArgs, for a saved input: form values from arguments, plus the argument names the form has no field for. */
+export function valuesFrom(fields, args) {
+  const values = {};
+  const known = new Set(fields.map((f) => f.name));
+  for (const { name, p } of fields) {
+    if (!Object.hasOwn(args, name)) continue;
+    const v = args[name];
+    const t = typeOf(p);
+    values[name] = t === "boolean" ? v === true : v !== null && typeof v === "object" ? JSON.stringify(v) : String(v);
+  }
+  return { values, extra: Object.keys(args).filter((k) => !known.has(k)) };
+}
+
 /** values: {name: string|boolean}. Returns {args, errors}: empty optional fields are left out; bad numbers or JSON are errors. */
 export function buildArgs(fields, values) {
   const args = {};

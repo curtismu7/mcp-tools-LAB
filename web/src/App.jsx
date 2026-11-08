@@ -8,11 +8,12 @@ import Stories from "./pages/Stories.jsx";
 import Diagram from "./pages/Diagram.jsx";
 import Limits from "./pages/Limits.jsx";
 import Gateway from "./pages/Gateway.jsx";
+import Proxy from "./pages/Proxy.jsx";
 import ReleaseBanner from "./components/ReleaseBanner.jsx";
 import { useGateway } from "./lib/gateway.js";
 import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMode.jsx";
 
-const PAGES = [["connect", "Connect"], ["server", "Server"], ["offline", "Scan a snapshot"], ["gateway", "Entitled listing"], ["stories", "Stories"], ["diagram", "How it fits"], ["limits", "Limits", true]];
+const PAGES = [["connect", "Connect"], ["server", "Server"], ["proxy", "Live proxy"], ["offline", "Scan a snapshot"], ["gateway", "Entitled listing"], ["stories", "Stories"], ["diagram", "How it fits"], ["limits", "Limits", true]];
 const store = {
   read(k) { try { return localStorage.getItem(k); } catch { return null; } },
   write(k, v) { try { localStorage.setItem(k, v); } catch { /* storage may be blocked */ } },
@@ -78,7 +79,8 @@ function Shell() {
       {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
       <main className="page" id="main" tabIndex={-1}>
         {page === "connect" && <Connect config={config} activeId={active?.id} onOpen={open} onRemoved={clear} />}
-        {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} />}
+        {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} mockOnly={Boolean(config?.mockOnly)} />}
+        {page === "proxy" && <Proxy modeSource={modeInfo?.source || "mock"} />}
         {page === "offline" && <Offline config={config} />}
         {page === "gateway" && <Gateway gw={gw} />}
         {page === "stories" && <Stories />}

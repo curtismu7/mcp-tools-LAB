@@ -19,6 +19,9 @@ import { createManager } from './mcp/manager.js';
 import { PROTOCOL_METHODS } from './mcp/methods.js';
 import { createMockStore, MOCK_REFUSAL, mockBodyAllowed, mockGuard, mockOnly } from './mock.js';
 import { createPingone } from './pingone.js';
+import { createFlagStore, FlagError } from './flags.js';
+import { createInputStore, InputError } from './inputs.js';
+import { createProxy } from './proxy/router.js';
 import { clip, scrub, scrubJson } from './redact.js';
 import { analyze, buildReport, parseSnapshot, SnapshotError } from './scanner/index.js';
 import { collectFromClient } from './scanner/live.js';
@@ -36,6 +39,9 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   const mock = mockOnly(env);
   if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
   const manager = createManager({ store, pingone: mock ? null : pingone, mock });
+  // Saved inputs live next to the connections file (memory only when the store is virtual).
+  const inputs = createInputStore({ dir: store.file ? path.dirname(store.file) : null, connectionExists: (id) => Boolean(store.get(id)) });
+  const flags = createFlagStore({ dir: store.file ? path.dirname(store.file) : null, connectionExists: (id) => Boolean(store.get(id)) });
   const maxScan = scanMaxBytes(env);
   const app = express();
   app.disable('x-powered-by');
@@ -88,6 +94,9 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     ...(mock ? { realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.' } : { realReason: null }),
   });
   let mode = 'mock';
+  // Live proxy (Peek-style flow log). Its control API is under /api/proxy; the proxy itself is /proxy/mcp/<id> (below).
+  const liveProxy = createProxy({ store, manager, getMode: () => mode, mockOnly: mock, secretsFor });
+  api.use('/proxy', liveProxy.api);
   api.get('/info', (_req, res) => res.set('Cache-Control', 'no-store').json(modeView()));
   api.post('/mode', small, (req, res) => {
     const body = req.body ?? {};
@@ -130,6 +139,8 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   }));
   api.delete('/connections/:id', wrap(async (req, res) => {
     if (!(await manager.remove(req.params.id))) return bad(res, 'no such connection', 404);
+    inputs.removeFor(req.params.id);
+    flags.removeFor(req.params.id);
     res.status(204).end();
   }));
 
@@ -137,11 +148,52 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   // are virtual, so the answer there is honest ("nothing stored").
   // Reset (rule 3): POST /api/reset clears every saved connection in this instance's store.
   api.post('/reset', wrap(async (_req, res) => {
+    liveProxy.reset(); // proxy off, its token gone, flow log cleared
+    inputs.clear();
+    flags.clear();
     if (store.file === null) return res.json({ ok: true, cleared: 0, note: 'mock-only: nothing is stored' });
     const ids = store.list().map((c) => c.id);
     for (const id of ids) await manager.remove(id);
     res.json({ ok: true, cleared: ids.length, note: 'saved connections removed' });
   }));
+
+  // ---- saved inputs: named argument sets per tool. Loading one fills the call form; the confirm gate still applies.
+  api.get('/connections/:id/inputs', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    if (req.query.tool !== undefined && typeof req.query.tool !== 'string') return bad(res, 'tool must be one tool name');
+    const tool = req.query.tool;
+    res.set('Cache-Control', 'no-store').json({ inputs: inputs.list(conn.id, tool) });
+  });
+  api.post('/connections/:id/inputs', small, (req, res) => {
+    if (mock) return res.status(403).json(MOCK_REFUSAL); // a shared mock copy keeps nothing one visitor could see from another
+    const conn = connection(req, res); if (!conn) return;
+    const body = isObject(req.body) ? req.body : {};
+    if (Object.keys(body).some((k) => !['tool', 'name', 'arguments', 'source'].includes(k))) return bad(res, 'accepted fields: tool, name, arguments, source');
+    try { res.status(201).json({ input: inputs.create(conn.id, body) }); } catch (err) { if (err instanceof InputError) return bad(res, err.message); throw err; }
+  });
+  api.delete('/connections/:id/inputs/:inputId', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    if (!inputs.remove(conn.id, req.params.inputId)) return bad(res, 'no such saved input', 404);
+    res.status(204).end();
+  });
+
+  // ---- flags: a note on a tool, resource or prompt, for the Markdown review brief (built in the page) ----
+  api.get('/connections/:id/flags', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    res.set('Cache-Control', 'no-store').json({ flags: flags.list(conn.id) });
+  });
+  api.put('/connections/:id/flags', small, (req, res) => {
+    if (mock) return res.status(403).json(MOCK_REFUSAL);
+    const conn = connection(req, res); if (!conn) return;
+    const body = isObject(req.body) ? req.body : {};
+    if (Object.keys(body).some((k) => !['kind', 'name', 'note'].includes(k))) return bad(res, 'accepted fields: kind, name, note');
+    try { res.json({ flag: flags.put(conn.id, body) }); } catch (err) { if (err instanceof FlagError) return bad(res, err.message); throw err; }
+  });
+  api.delete('/connections/:id/flags/:flagId', (req, res) => {
+    const conn = connection(req, res); if (!conn) return;
+    if (!flags.remove(conn.id, req.params.flagId)) return bad(res, 'no such flag', 404);
+    res.status(204).end();
+  });
 
   // ---- see: list ---------------------------------------------------------
   api.get('/connections/:id/tools', wrap(async (req, res) => {
@@ -259,6 +311,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   });
   app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
   app.use('/api', api);
+  app.use('/proxy', liveProxy.proxy); // MCP clients send no Origin: the proxy has its own guards (proxy/router.js)
 
   if (fs.existsSync(path.join(WEB_DIST, 'index.html'))) {
     app.use(express.static(WEB_DIST));

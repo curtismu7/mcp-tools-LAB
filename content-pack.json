@@ -85,6 +85,15 @@
       "definition": "The part of this tool that connects to an MCP server and shows what it offers (tools, resources, prompts) as plain text, and can call a tool after a confirm step. It sees; it does not judge."
     },
     {
+      "id": "live-proxy",
+      "term": "Live proxy",
+      "definition": "A local debugging passthrough in this app. Point an MCP client at it instead of at the server and every JSON-RPC message it sends and gets back is logged, with timing and an estimated token cost. It enforces no policy and the confirm step does not cover the agent's calls through it; it is not a gateway.",
+      "aliases": [
+        "flow log",
+        "debugging proxy"
+      ]
+    },
+    {
       "id": "mcp-aggregate",
       "term": "MCP aggregate",
       "definition": "An application of type mcp-aggregate that merges several member MCP servers into one. Console swagger names, 2026-10-31, schema only: Members, and per member AppRef, Alias and ToolFilter. The schema says a member's tools are namespaced as Alias__tool. These names already existed on 2026-10-26; the behaviour is a Ping claim, UNVERIFIED on our tenant.",
@@ -102,9 +111,27 @@
       ]
     },
     {
+      "id": "review-brief",
+      "term": "Review brief",
+      "definition": "A Markdown file this app builds from the items an operator flagged on a server: the notes, the server's own definitions and the scan findings, for a coding agent or a reviewer. Server text is fenced and labelled as untrusted data, so the brief does not pass on the injection it reports.",
+      "aliases": [
+        "flag",
+        "review brief markdown"
+      ]
+    },
+    {
       "id": "scan-report",
       "term": "Scan report",
       "definition": "The machine-readable result of a scan (scan-report/1): the findings with rule id, severity and evidence, the input counts, the rule table and the list of what a metadata scan cannot catch. It records enforcement as none."
+    },
+    {
+      "id": "token-estimate",
+      "term": "Token estimate",
+      "definition": "How much of an agent's context a tool list, a definition or a result takes up, estimated as characters divided by four. It is a rough rule, not a tokenizer: real counts differ by model. A long or poisoned tool list costs the agent context before it does anything.",
+      "aliases": [
+        "token cost",
+        "context cost"
+      ]
     },
     {
       "id": "tool-filter",
@@ -222,6 +249,20 @@
       }
     },
     {
+      "id": "live-proxy",
+      "label": "Watch an agent through the live proxy",
+      "description": "Point Claude Code or another MCP client at this tool and see every JSON-RPC message, with timing and an estimated token cost. A local passthrough, not a gateway: the confirm step does not cover the agent's calls.",
+      "group": "try-it",
+      "terms": [
+        "live-proxy",
+        "token-estimate"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#proxy"
+      }
+    },
+    {
       "id": "offline",
       "label": "Scan a snapshot offline",
       "description": "Paste or load a tools/list JSON and scan it with no server. Invisible characters are shown as [U+XXXX].",
@@ -233,6 +274,20 @@
       "action": {
         "type": "route",
         "href": "/#offline"
+      }
+    },
+    {
+      "id": "review-brief",
+      "label": "Flag items and hand over a review brief",
+      "description": "Flag tools, resources or prompts with a note and download a Markdown brief for a coding agent, with server text fenced as untrusted data.",
+      "group": "try-it",
+      "terms": [
+        "review-brief",
+        "tool-poisoning"
+      ],
+      "action": {
+        "type": "route",
+        "href": "/#server"
       }
     },
     {
