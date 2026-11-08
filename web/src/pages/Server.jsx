@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { del, get, post, pretty, put } from "../lib/api.js";
 import { buildBrief, downloadBrief } from "../lib/brief.js";
 import FlagControl from "../components/FlagControl.jsx";
+import OAuthPanel from "../components/OAuthPanel.jsx";
 import { Untrusted, spansFor } from "../lib/Untrusted.jsx";
 import CallPanel from "../components/CallPanel.jsx";
 import ConfirmCall from "../components/ConfirmCall.jsx";
@@ -124,6 +125,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
     <>
       <h2>Server: <Untrusted text={conn.label} /></h2>
       <p className="lede">{conn.transport === "http" ? <Untrusted text={conn.url} /> : conn.transport}{conn.token === "set" ? " · token set" : ""}</p>
+      {conn.transport === "http" && !mockOnly && <OAuthPanel conn={conn} onSignedIn={() => { setTools(null); list(); }} />}
       {!scan && <p className="notice" data-testid="scan-banner"><strong>Scan before first use.</strong> This connection has not been scanned. What is listed below is what an agent would be given as trusted context. Press Scan before you call anything.</p>}
       {(changed.length > 0 || scanCover === "older") && (
         <p className="alert" role="alert" data-testid="changed">

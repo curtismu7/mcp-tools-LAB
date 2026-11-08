@@ -49,7 +49,14 @@ The Live proxy page turns this tool into a local debugging passthrough, so you c
 - Mock mode offers the two built-in sample servers only, answered in this process. Real adds your saved servers: http servers are a raw passthrough (SSE streams included, redirects refused); stdio and PingOne connections are bridged through this tool's own client.
 - It is not a gateway and enforces no policy. **The confirm step of the Server page does not apply to calls an agent makes through the proxy.**
 - The log keeps the last 200 flows in memory only, bodies capped at 64 KB. Token counts are characters / 4, an estimate and not a tokenizer.
-- Not built: one aggregate URL for all servers, and running OAuth for the client (a server that needs an OAuth sign-in has to be saved with a token first).
+- **One URL for all servers:** `http://127.0.0.1:4810/proxy/mcp/` merges the tools of every route offered in this mode, named `<server>__<tool>`, and routes each call to its server. A server that cannot be reached is listed in the reply's `_meta`, never dropped silently. Tools only: resources and prompts stay on the per-server URLs.
+- **stdio servers stream:** a GET on a stdio route opens server-sent events with what the server sends on its own (progress, logs, list_changed, its requests to the client); the client's answers are written back to the server.
+- **A Mock/Real switch** empties the flow log and closes open streams; the proxy stays on.
+- **OAuth:** a server that asks for an OAuth token can be signed in to from the Server page (below); the proxy then uses that token upstream.
+
+### OAuth sign-in (third-party servers)
+
+When a saved http server answers 401 with OAuth metadata, the Server page shows an **OAuth sign-in** card with the authorization server and scopes. **Sign in** registers this tool with that server (dynamic client registration, or a client id you type) and opens the sign-in in a new tab; the page picks it up when the tab lands back on `http://127.0.0.1:4810/api/oauth/callback`. PKCE S256, `resource`, a single-use state and the `iss` check apply. The token stays in this tool's memory only and is refreshed before it expires. This is a recorded exception to the family's pi.flow-only rule, for third-party servers only: Ping authorization servers are refused. See [docs/rule-16-waiver.md](docs/rule-16-waiver.md).
 
 ### Saved inputs and token estimates
 

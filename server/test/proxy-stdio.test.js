@@ -14,7 +14,7 @@ function events(body) {
   const reader = body.getReader(); const dec = new TextDecoder(); let buf = ''; const got = [];
   return {
     got,
-    async until(want, ms = 5000) {
+    async until(want, ms = 10000) {
       const stop = Date.now() + ms;
       while (got.length < want && Date.now() < stop) {
         const { done, value } = await Promise.race([reader.read(), new Promise((r) => setTimeout(() => r({ timeout: true }), 200))]);

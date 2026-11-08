@@ -32,7 +32,7 @@ const TRANSPORTS = new Set(['http', 'stdio', 'pingone']);
 const FIXTURE_IDS = Object.keys(FIXTURES).map((f) => `mock-${f}`);
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
-export function createProxy({ store, manager, getMode, mockOnly, secretsFor, headerTimeoutMs = 30_000 }) {
+export function createProxy({ store, manager, getMode, mockOnly, secretsFor, oauth = null, headerTimeoutMs = 30_000 }) {
   const flows = createFlowLog();
   const state = { enabled: false, token: null };
   const fixtureClients = new Map();
@@ -131,7 +131,10 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
   async function passthrough({ req, res, conn, reqText, secrets, flow, started, done }) {
     const headers = {};
     for (const k of ['content-type', 'accept', 'mcp-session-id', 'mcp-protocol-version', 'last-event-id']) if (req.headers[k]) headers[k] = req.headers[k];
-    if (conn.token) headers[conn.authHeader || 'Authorization'] = conn.token;
+    await oauth?.fresh(conn.id);
+    const signedIn = oauth?.auth(conn.id); // a third-party OAuth sign-in wins over a saved token
+    if (signedIn) headers[signedIn[0]] = signedIn[1];
+    else if (conn.token) headers[conn.authHeader || 'Authorization'] = conn.token;
     const ac = new AbortController();
     inflight.add(ac);
     res.on('close', () => { ac.abort(); inflight.delete(ac); });
@@ -147,7 +150,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
     const out = {};
     for (const k of ['content-type', 'mcp-session-id', 'cache-control']) { const v = up.headers.get(k); if (v) out[k] = v; }
     res.status(up.status).set(out);
-    if (up.status === 401) flow.error = 'upstream refused the saved credential (401); the proxy does not run OAuth for the client';
+    if (up.status === 401) flow.error = 'upstream refused the credential (401): sign in on the Server page (OAuth) or save the server with a token';
     flow.status = up.status; // visible while an SSE stream is still open
     flow.response = { headers: keptHeaders(up.headers), body: { bytes: 0, truncated: false, tokens: 0 } };
     // The client gets the upstream reply with every secret of this connection scrubbed out, streamed as it arrives.
