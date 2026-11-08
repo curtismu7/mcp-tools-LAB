@@ -15,7 +15,7 @@ const conn = (app, url, extra = {}) => app.call('POST', '/api/connections', { tr
 const h = (token) => ({ Connection: 'close', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
 
 test('Ping hosts: a trailing dot is the same host, and every endpoint is checked, not only the issuer', T, async () => {
-  for (const host of ['auth.pingidentity.com.', 'x.ping-devops.com.', 'AUTH.PINGONE.COM']) assert.ok(isPingHost(host), host);
+  for (const host of ['auth.pingidentity.com.', 'placeholder.ping-devops.com.', 'AUTH.PINGONE.COM']) assert.ok(isPingHost(host), host);
   const w = await world({ authEndpoint: 'https://auth.pingone.com/env/as/authorize' }); // a non-Ping issuer fronting a Ping endpoint
   const app = await startApp();
   try {
