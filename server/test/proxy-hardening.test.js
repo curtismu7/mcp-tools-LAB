@@ -166,3 +166,29 @@ test('an upstream that never sends headers ends in a 502 after the header timeou
   assert.match((await r.json()).message, /no response headers/);
   assert.ok(Date.now() - started < 5000);
 });
+
+test('a Mock/Real switch empties the flow log and closes open streams; the proxy stays on', T, async () => {
+  const url = await upstream((req, res) => {
+    if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('event: message\ndata: {"n":1}\n\n'); return; }
+    res.writeHead(202).end();
+  });
+  const app = await startApp();
+  try {
+    const { id, token } = await realProxy(app, url);
+    const r = await fetch(`${app.origin}/proxy/mcp/${id}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' } });
+    const reader = r.body.getReader();
+    await reader.read();
+    assert.equal((await app.call('GET', '/api/proxy/flows')).json.flows.length, 1);
+    await app.call('POST', '/api/mode', { source: 'mock' });
+    const end = await Promise.race([reader.read().then((x) => x.done).catch(() => true), new Promise((res) => setTimeout(() => res('still open'), 3000))]);
+    assert.equal(end, true);
+    assert.equal((await app.call('GET', '/api/proxy/flows')).json.flows.length, 0);
+    const v = (await app.call('GET', '/api/proxy')).json;
+    assert.equal(v.enabled, true);
+    assert.equal(v.token, token);
+    await app.call('POST', '/api/mode', { source: 'mock' }); // same mode again: nothing is cleared
+    await post(app.origin, '/proxy/mcp/mock-sample', token, INIT);
+    await app.call('POST', '/api/mode', { source: 'mock' });
+    assert.equal((await app.call('GET', '/api/proxy/flows')).json.flows.length, 1);
+  } finally { await app.close(); }
+});

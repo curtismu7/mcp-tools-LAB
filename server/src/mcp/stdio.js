@@ -14,6 +14,7 @@ export function createStdioClient({ command, args = [], env = {}, timeoutMs = 30
   let ready = null;
   let nextId = 0;
   const waiting = new Map(); // id -> { resolve, reject, timer }
+  const listeners = new Set(); // the live proxy's stdio stream: messages the server sends on its own
   let stderrTail = '';
 
   function fail(err) { for (const w of waiting.values()) { clearTimeout(w.timer); w.reject(err); } waiting.clear(); }
@@ -21,8 +22,11 @@ export function createStdioClient({ command, args = [], env = {}, timeoutMs = 30
   function onLine(line) {
     let msg;
     try { msg = JSON.parse(line); } catch { return; }
-    const w = msg && waiting.get(msg.id);
-    if (!w || msg.method) return; // server-initiated requests (sampling, roots) are not answered
+    const w = msg && !msg.method ? waiting.get(msg.id) : undefined;
+    if (!w) { // server-initiated (a notification or a request such as roots/list): given to a stream if one is open
+      if (msg && typeof msg === 'object') for (const fn of listeners) fn(msg);
+      return; // with no stream open, requests are not answered (as before)
+    }
     waiting.delete(msg.id); clearTimeout(w.timer);
     if (msg.error) w.reject(rpcError(msg.error.message || 'MCP RPC error', 'mcp_rpc_error', { mcpCode: msg.error.code }));
     else w.resolve(msg.result);
@@ -66,6 +70,10 @@ export function createStdioClient({ command, args = [], env = {}, timeoutMs = 30
     async rpc(method, params = {}) { await ensure(); return request(method, params); },
     info: () => info,
     stderrTail: () => stderrTail,
+    // For the live proxy's stdio stream. subscribe(fn) returns the unsubscribe function; send(msg) writes one message
+    // as is (a client's answer to a server request, or a client notification).
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    async send(msg) { await ensure(); child.stdin.write(`${JSON.stringify(msg)}\n`); },
     async close() { ready = null; child?.kill(); child = null; },
   };
 }

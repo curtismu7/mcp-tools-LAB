@@ -103,7 +103,9 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     if (!isObject(body) || Object.keys(body).some((k) => k !== 'source')) return bad(res, 'the only accepted body field is { "source": "mock" | "real" }.');
     if (body.source !== 'mock' && body.source !== 'real') return bad(res, 'source must be "mock" or "real".');
     if (body.source === 'real' && mock) return res.status(409).json({ error: 'real_not_available', message: 'Real is not available: this hosted copy is mock only (MOCK_ONLY=1). Every server here is an in-process fixture; set up your own copy without MOCK_ONLY to inspect real servers.', source: 'mock' });
-    mode = body.source === 'real' ? 'real' : 'mock';
+    const next = body.source === 'real' ? 'real' : 'mock';
+    if (next !== mode) liveProxy.modeChanged(); // rule 19: the proxy's log and open streams belong to the old mode
+    mode = next;
     res.json(modeView());
   });
   api.get('/rules', (_req, res) => res.json({ rules: Object.entries(RULES).map(([id, r]) => ({ id, ...r })), limits: LIMITS }));

@@ -15,7 +15,9 @@
 //    that echoes the saved credential has it scrubbed from what the client receives too (rule 4).
 //  - Mock mode (rule 19) offers the two built-in fixtures only, answered in this process; saved connections need Real.
 //  - http targets: raw passthrough (bytes streamed, SSE included), redirects refused. stdio / PingOne / fixtures:
-//    bridged (JSON-RPC answered through this tool's own client for that connection).
+//    bridged (JSON-RPC answered through this tool's own client for that connection). A stdio route also streams: a GET
+//    opens server-sent events carrying what the server sends on its own (progress, logs, list_changed, its requests
+//    to the client), and the client's answers to those requests are POSTed back and written to the server as sent.
 import crypto from 'node:crypto';
 import express from 'express';
 import { createMockClient, FIXTURES } from '../mock.js';
@@ -172,17 +174,26 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
   // JSON-RPC answered through this tool's own client for that connection (fixture, stdio or PingOne).
   async function bridge({ req, res, target, reqText, secrets, done }) {
     if (req.method === 'DELETE') { res.status(204).end(); return done(204, null); }
-    if (req.method !== 'POST') { res.status(405).set('Allow', 'POST, DELETE').json({ error: 'method_not_allowed', message: 'This route is bridged: POST JSON-RPC only (no server-sent stream).' }); return done(405, null); }
+    const client = clientFor(target);
+    const streams = typeof client.subscribe === 'function'; // stdio
+    if (req.method === 'GET' && streams) return stream({ req, res, target, client, secrets, done });
+    if (req.method !== 'POST') { res.status(405).set('Allow', 'POST, DELETE').json({ error: 'method_not_allowed', message: 'This route is bridged: POST JSON-RPC only (no server-sent stream for this transport).' }); return done(405, null); }
     let msg = null; // the request as sent (the flow log holds a scrubbed, capped copy; never forward that)
     try { msg = JSON.parse(reqText); } catch { msg = null; }
+    // A client's answer to a server request (stdio only): written to the server as sent.
+    if (streams && isObject(msg) && msg.jsonrpc === '2.0' && msg.method === undefined && msg.id !== undefined && ('result' in msg || 'error' in msg)) {
+      await client.send(msg); res.status(202).end(); return done(202, null);
+    }
     const reply = (status, payload) => {
       const text = JSON.stringify(scrubJson(payload, secrets)); // a bridged server's echo of a secret is scrubbed too
       res.status(status).type('application/json').send(text);
       done(status, { headers: { 'content-type': 'application/json' }, body: captureBody(text, { secrets, contentType: 'application/json' }) });
     };
     if (!isObject(msg) || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return reply(400, { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'one JSON-RPC 2.0 message per POST (batches are not supported on a bridged route)' } });
-    if (msg.id === undefined) { res.status(202).end(); return done(202, null); } // a notification
-    const client = clientFor(target);
+    if (msg.id === undefined) { // a notification: stdio gets it (this tool already sent its own initialized)
+      if (streams && msg.method !== 'notifications/initialized') await client.send(msg);
+      res.status(202).end(); return done(202, null);
+    }
     try {
       let result;
       if (msg.method === 'initialize') { await client.ensure(); const i = client.info() || {}; result = { protocolVersion: i.protocolVersion, capabilities: i.capabilities || {}, serverInfo: i.serverInfo || { name: 'bridged', version: '0' } }; }
@@ -192,6 +203,30 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
     } catch (err) {
       return reply(200, { jsonrpc: '2.0', id: msg.id, error: { code: Number.isInteger(err.mcpCode) ? err.mcpCode : -32603, message: clip(scrub(err.message, secrets)) } });
     }
+  }
+
+  // The stdio stream: one SSE event per message the server sends on its own, each also logged as its own flow.
+  async function stream({ req, res, target, client, secrets, done }) {
+    await client.ensure();
+    res.status(200).set({ 'content-type': 'text/event-stream', 'cache-control': 'no-store' });
+    res.flushHeaders();
+    res.write(': stream open\n\n');
+    done(200, { headers: { 'content-type': 'text/event-stream' }, body: { bytes: 0, truncated: false, tokens: 0 } });
+    const label = clip(target.conn?.label ?? req.params.id, 80);
+    const unsubscribe = client.subscribe((raw) => {
+      const msg = scrubJson(raw, secrets);
+      const text = JSON.stringify(msg);
+      res.write(`event: message\ndata: ${text}\n\n`);
+      flows.add({
+        at: new Date().toISOString(), route: req.params.id, routeLabel: label, transport: target.conn?.transport ?? 'stdio', via: 'stream',
+        httpMethod: 'SSE', ...rpcSummary(msg), status: 200, ms: 0, open: false,
+        request: { headers: {}, body: { bytes: 0, truncated: false, tokens: 0 } },
+        response: { headers: { 'content-type': 'text/event-stream' }, body: captureBody(text, { secrets, contentType: 'application/json' }) }, error: null,
+      });
+    });
+    const handle = { abort() { unsubscribe(); res.end(); } };
+    inflight.add(handle);
+    res.on('close', () => { unsubscribe(); inflight.delete(handle); });
   }
 
   // ---- the control API (mounted inside /api: same-origin writes apply) ---------------------------------------
@@ -218,5 +253,7 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
   return {
     proxy, api,
     reset() { setEnabled(false); flows.clear(); fixtureClients.clear(); },
+    // A Mock/Real switch: the flow log is emptied and open streams are closed; the proxy stays on with the same token.
+    modeChanged() { closeAll(); flows.clear(); },
   };
 }
