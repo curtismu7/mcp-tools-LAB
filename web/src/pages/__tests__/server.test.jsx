@@ -237,26 +237,36 @@ describe("Server page: locked calls", () => {
 });
 
 describe("Server page: Run on a tool card", () => {
-  it("selects that tool in the call panel and sends nothing; Review and confirm still apply", async () => {
+  it("opens the call form inside that card; Review, confirm and the result all stay in the card", async () => {
     mockServer({ "POST /api/connections/c1/scan": () => ({ report: REPORT, listed: { tools: TOOLS, resources: [], prompts: [] } }) });
     const user = userEvent.setup();
     await openServer(user);
     await user.click(screen.getByRole("button", { name: "Scan" }));
     await screen.findByTestId("scan-result");
     await user.click(screen.getByRole("button", { name: "Run get_weather" }));
-    expect(screen.getByLabelText("Tool")).toHaveValue("get_weather");
+    const card = screen.getByTestId("inline-run");
+    expect(within(card).queryByLabelText("Tool")).toBeNull(); // the tool is fixed
     expect(sent("POST /api/connections/c1/call")).toHaveLength(0);
-    expect(sent("POST /api/connections/c1/call/preview")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Review call" })).toBeInTheDocument();
+    await user.type(within(card).getByLabelText(/^city/), "Paris");
+    await user.click(within(card).getByRole("button", { name: "Review call" }));
+    expect(sent("POST /api/connections/c1/call/preview")[0].body).toEqual({ tool: "get_weather", arguments: { city: "Paris" } });
+    await user.click(await screen.findByRole("button", { name: "Send call" }));
+    expect(sent("POST /api/connections/c1/call")[0].body).toMatchObject({ tool: "get_weather", arguments: { city: "Paris" }, confirm: true });
+    expect(await within(card).findByText(/<script>alert\(1\)<\/script> done/)).toBeInTheDocument();
+    expect(document.querySelector("script")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Close get_weather" }));
+    expect(screen.queryByTestId("inline-run")).toBeNull();
   });
 
-  it("before a scan, Run picks the tool and the locked panel offers Scan now; after the scan the tool is still picked", async () => {
+  it("before a scan the card offers Scan now; one card is open at a time", async () => {
     mockServer({ "POST /api/connections/c1/scan": () => ({ report: REPORT, listed: { tools: TOOLS, resources: [], prompts: [] } }) });
     const user = userEvent.setup();
     await openServer(user);
     await user.click(await screen.findByRole("button", { name: "Run get_weather" }));
-    await user.click(within(screen.getByTestId("call-locked")).getByRole("button", { name: "Scan now" }));
+    await user.click(within(screen.getByTestId("inline-run")).getByRole("button", { name: "Scan now" }));
     await screen.findByTestId("scan-result");
-    expect(screen.getByLabelText("Tool")).toHaveValue("get_weather");
+    expect(within(screen.getByTestId("inline-run")).getByRole("button", { name: "Review call" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Run <img/ }));
+    expect(screen.getAllByTestId("inline-run")).toHaveLength(1);
   });
 });

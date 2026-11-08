@@ -55,3 +55,15 @@ test('Real: saved servers join; one that is down is reported in _meta, not dropp
     assert.equal(up.seen.methods.filter((m) => m === 'tools/list').length, 1, 'only the Real listing reached the server');
   } finally { await app.close(); }
 });
+
+test('a sample saved as a connection (transport mock) is not offered twice in Real', T, async () => {
+  const app = await startApp();
+  try {
+    await app.call('POST', '/api/connections', { transport: 'mock', fixture: 'sample' });
+    await app.call('POST', '/api/mode', { source: 'real' });
+    const v = (await app.call('POST', '/api/proxy', { enabled: true })).json;
+    assert.deepEqual(v.routes.map((r) => r.transport), ['mock', 'mock']);
+    const names = (await rpc(app, v.token, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).json.result.tools.map((t) => t.name);
+    assert.equal(names.filter((n) => n.endsWith('__get_time')).length, 1);
+  } finally { await app.close(); }
+});

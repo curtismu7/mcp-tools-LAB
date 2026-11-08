@@ -9,8 +9,9 @@ import { SEV } from "./ScanResult.jsx";
 // Pick a tool, fill the form, Review call -> the server returns the canonical arguments and their hash -> the dialog shows
 // exactly that text -> only the Send click posts {confirm:true, argsHash}. Changing the tool or any value drops the preview.
 // `pick` ({name, at}) comes from a Run button on a tool card: it selects that tool here. It never sends anything.
-export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick }) {
-  const [name, setName] = useState("");
+// `fixedTool`: the panel is for that one tool (a Run button on its card); the tool picker is hidden.
+export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onScan, scanning, pick, fixedTool }) {
+  const [name, setName] = useState(fixedTool || "");
   const [values, setValues] = useState({});
   const [raw, setRaw] = useState("{}");
   const [review, setReview] = useState(null); // {canonical, argsHash, args}
@@ -96,14 +97,16 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
 
   return (
     <div>
-      <div className="fields">
-        <label>Tool
-          <select value={name} onChange={(e) => setName(e.target.value)}>
-            <option value="">Choose a tool</option>
-            {(tools || []).map((t, i) => <option key={`${t.name}-${i}`} value={t.name}>{t.name}</option>)}
-          </select>
-        </label>
-      </div>
+      {!fixedTool && (
+        <div className="fields">
+          <label>Tool
+            <select value={name} onChange={(e) => setName(e.target.value)}>
+              <option value="">Choose a tool</option>
+              {(tools || []).map((t, i) => <option key={`${t.name}-${i}`} value={t.name}>{t.name}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
       {tool && (
         <>
           {flagged && <p className="alert" role="alert">The scan flagged this tool ({SEV[flagged]}). Read its findings first. Calling it is your decision; nothing was blocked.</p>}

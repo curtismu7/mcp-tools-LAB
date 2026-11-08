@@ -54,7 +54,8 @@ export function createProxy({ store, manager, getMode, mockOnly, secretsFor, hea
   function fixtureRoute(id) { const f = id.slice(5); return { id, label: FIXTURES[f].label, transport: 'mock', fixture: f }; }
   function routes() {
     const out = FIXTURE_IDS.map(fixtureRoute);
-    if (realAllowed()) for (const c of store.list()) if (!FIXTURE_IDS.includes(c.id)) out.push({ id: c.id, label: c.label, transport: c.transport });
+    // A saved 'mock' connection is one of the samples, already offered above: listed once, not twice.
+    if (realAllowed()) for (const c of store.list()) if (!FIXTURE_IDS.includes(c.id) && TRANSPORTS.has(c.transport)) out.push({ id: c.id, label: c.label, transport: c.transport });
     return out.map((r) => ({ id: r.id, label: r.label, transport: r.transport, path: `/proxy/mcp/${encodeURIComponent(r.id)}` }));
   }
   // Aliases for the one-URL route: a slug of the label, made unique in order (sample, sample-2, ...).
