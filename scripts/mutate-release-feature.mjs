@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Mutation check for the entitled-listing feature (Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant)).
+// Mutation check for the entitled-listing feature (Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant)).
 // For each mutant it changes ONE thing in a source file, runs the tests that should notice, and expects them to FAIL.
 // A mutant that passes the tests "survived" and the script exits 1. The file is always put back, even on Ctrl-C.
 // Every mutant names the exact text it replaces and how many times that text occurs, so a mutant can never silently

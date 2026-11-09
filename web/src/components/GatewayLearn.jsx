@@ -2,7 +2,7 @@ import React from "react";
 
 // Teaching content for the Entitled listing page: what an MCP aggregate is, the six checks a tool has to pass, guided
 // steps and a glossary. Mock examples are names from the lab's invented members (crm, bill, wiki); nothing here is a
-// Ping format, and the behaviour is a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant until Real measures it.
+// Ping format, and the behaviour is a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant until Real measures it.
 
 export function Intro({ real }) {
   return (

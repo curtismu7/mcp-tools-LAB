@@ -11,7 +11,7 @@
     {
       "n": 1,
       "title": "Read the label first",
-      "tell": "Every tab carries the banner: Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant. In Mock the page runs a simulation in this app; in Real it asks your own gateway's aggregate apps with your agent keys.",
+      "tell": "Every tab carries the banner: Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant. In Mock the page runs a simulation in this app; in Real it asks your own gateway's aggregate apps with your agent keys.",
       "say": "Everything on this page is a claim we are showing, not something we measured.",
       "why": "Challenge (Ping claim): one shared token and every tool exposed to every caller means no attribution and no per-tool control. Without the label, a simulation reads like a result.",
       "alt": {

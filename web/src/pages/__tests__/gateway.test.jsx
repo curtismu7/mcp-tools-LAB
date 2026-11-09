@@ -14,7 +14,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 configure({ asyncUtilTimeout: 8000 });
 
 const PAGES = ["Connect", "Server", "Scan a snapshot", "Entitled listing", "Stories", "How it fits", "Limits"];
-const BANNER = /Ping release claim \(2026-11-02\), listing and cap measured on gateway v1\.261106 \(2026-11-08\), per-caller entitlement UNVERIFIED on our tenant/;
+const BANNER = /Ping release claim \(2026-11-02\), listing and cap measured on gateway v1\.261106 \(2026-11-08\), access by caller measured per aggregate \(2026-11-09\), per-tool filtering per caller UNVERIFIED on our tenant/;
 
 async function openGateway(user) {
   render(<App />);

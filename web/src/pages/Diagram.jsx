@@ -43,7 +43,7 @@ const NARROW = {
 const DOWN = { sourceHandle: "bb", targetHandle: "tt" };
 const NARROW_EDGES = { e1: DOWN, e2: DOWN, e3: DOWN, e4: DOWN, e5: DOWN, e6: { sourceHandle: "r", targetHandle: "ls" }, e7: { sourceHandle: "r", targetHandle: "ls" } };
 
-// The entitled-listing view: a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant, drawn from the lab's own model.
+// The entitled-listing view: a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant, drawn from the lab's own model.
 const GW_START = [
   { id: "gcaller", position: { x: 0, y: 120 }, data: { title: "Caller", sub: "Asks tools/list, then calls a tool by name" } },
   { id: "ggw", position: { x: 215, y: 120 }, data: { title: "Gateway: entitlement filter", sub: "Removes tools the caller may not use, and refuses them by name" } },
@@ -87,7 +87,7 @@ export const SCENARIOS = {
     label: "Entitled listing and cap",
     view: "gateway",
     steps: [
-      { edges: ["g1"], nodes: ["gcaller", "ggw"], text: "The caller asks the gateway what it may use. (Ping release claim: simulated in Mock, measured by Real; per-caller entitlement is UNVERIFIED on our tenant.)" },
+      { edges: ["g1"], nodes: ["gcaller", "ggw"], text: "The caller asks the gateway what it may use. (Ping release claim: simulated in Mock, measured by Real; per-tool filtering per caller is UNVERIFIED on our tenant.)" },
       { edges: ["g2"], nodes: ["ggw", "gagg"], text: "The reply holds only the tools this caller is entitled to, named alias__tool. The aggregate's policy caps what any member tool may be used for. Nothing says what was left out." },
       { edges: ["g5"], nodes: ["gdown", "gagg"], text: "A member that cannot be reached is reported in the reply, not silently dropped." },
       { edges: ["g3"], nodes: ["gagg", "ghop"], text: "A call by name is checked again, so a hidden tool is refused when it is called, not only left off the list." },
@@ -232,7 +232,7 @@ export default function Diagram({ theme = "system", onNavigate, gw, embedded = f
   return (
     <>
       {!embedded && <h2>How the pieces fit</h2>}
-      {!embedded && <p className="lede">Connect and see, scan to judge before an agent ingests, you decide, the confirm dialog gates the call, and the Privilege demo controls calls on the wire. Drag any box. The third run is a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant, simulated by this app.</p>}
+      {!embedded && <p className="lede">Connect and see, scan to judge before an agent ingests, you decide, the confirm dialog gates the call, and the Privilege demo controls calls on the wire. Drag any box. The third run is a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant, simulated by this app.</p>}
       <div className="card controls">
         {!embedded && <label>Run<select value={scenario} onChange={(e) => pick(e.target.value)}>{Object.entries(SCENARIOS).map(([id, s]) => <option key={id} value={id}>{s.label}</option>)}</select></label>}
         <label>Speed<select value={speed} onChange={(e) => setSpeed(e.target.value)}>{SPEEDS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>

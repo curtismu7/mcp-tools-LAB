@@ -1,5 +1,5 @@
 // The simulated gateway over HTTP: wire shape, hostile input, credentials never echoed, zero outbound, mock-only mode,
-// the scan of a filtered listing, and how every name is tagged. Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant).
+// the scan of a filtered listing, and how every name is tagged. Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';

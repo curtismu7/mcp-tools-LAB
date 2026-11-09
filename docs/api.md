@@ -17,7 +17,7 @@ Every request needs a loopback `Host`. Every non-GET needs `Origin` equal to `Ho
 | `POST /api/scan` | `{snapshot, trustedNames?}`. Offline scan of a pasted `tools/list` snapshot (string or object). Size capped (413). |
 | `POST /api/connections/:id/call/preview` | `{tool, arguments}` returns `{canonical, argsHash}`: the exact text to show the operator. |
 | `POST /api/connections/:id/call` | `{tool, arguments, confirm:true, argsHash}`. 428 without confirm, 409 on a hash mismatch. |
-| `GET /api/gateway/default` | The default simulated-gateway config, the tag vocabulary and the claim label. Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant. |
+| `GET /api/gateway/default` | The default simulated-gateway config, the tag vocabulary and the claim label. Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant. |
 | `POST /api/gateway/list` | `{config?, caller, view?: 'aggregate'\|'direct', member?}` returns the tools that caller sees and the member status. Hidden tools are absent and not counted. |
 | `POST /api/gateway/call` | `{config?, caller, view?, member?, tool, arguments?}`. 200 for an allowed tool, 403 `tool_not_available` with the same words for a hidden or unknown one, plus a labelled demo trace. |
 | `POST /api/gateway/audit` | Same body as list. Names every tool and the layer that stopped it. Demo only: a caller never sees this. |
