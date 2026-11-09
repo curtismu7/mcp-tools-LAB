@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
+// Opened from Customer Agent LAB (UC-LEARN3 and UC-LEARN4 route here): strip + header Back only, nothing preselected.
+import ReturnLink from "./return-link/ReturnLink.jsx";
 import { get, post } from "./lib/api.js";
 import Connect from "./pages/Connect.jsx";
 import Server from "./pages/Server.jsx";
@@ -54,6 +56,7 @@ function Shell() {
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
       <header className="top">
         <h1>MCP tools</h1>
+        <ReturnLink app="mcp-tools" variant="header" />
         <ShelfLink />
         <div className="seg" role="group" aria-label="Mock or Real" data-testid="mode-toggle">
           <button type="button" aria-pressed={modeInfo?.source !== "real"} aria-disabled={modeInfo?.source === "real" || undefined} onClick={() => chooseMode("mock")} data-testid="mode-mock">Mock</button>
@@ -75,6 +78,7 @@ function Shell() {
       </header>
       <PresentBar />
       <ReleaseBanner config={config} source={modeInfo?.source || "mock"} />
+      <ReturnLink app="mcp-tools" />
       {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
       {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
       <main className="page" id="main" tabIndex={-1}>
