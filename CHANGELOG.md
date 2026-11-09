@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Changed: the Entitled listing docs now record a three-key comparison on gateway `v1.261106` (2026-11-09): access differs by caller at the level of a whole aggregate, while per-caller filtering of individual tools is still UNVERIFIED.
+- Changed: a three-key comparison on gateway `v1.261106` (2026-11-09) showed access differs by caller at the level of a whole aggregate. The banner and docs now say so; per-tool filtering per caller is still UNVERIFIED. Re-vendored `standalone-ui.css` from the family's main.
 - Added: a 401 Bearer challenge on a call made through the live proxy (per-server or one URL) also brings up the OAuth sign-in on the Server page, and a 403 that names missing scopes for a signed-in user now says which scope is missing and what has to be true for it to be requested (`mcp_scope_needed`).
 - Added: a server that answers initialize and tools/list anonymously but refuses `tools/call` (the Banking MCP server) now gets the OAuth sign-in. A 401 Bearer challenge on a call is remembered, the sign-in card appears, and you run the call again after signing in.
 - Changed: the Entitled listing banner and docs now say which gateway version was measured. Our SE gateway runs `v1.261106` (after the 2026-11-02 release), and Real measured the listing and the cap on it; per-caller entitlement is still UNVERIFIED (one agent key). Added the optional `MCP_TOOLS_GW_VERSION` label, shown on the Real tab. Removed the old "SE gateway is v1.261030 and does not have it" statements.

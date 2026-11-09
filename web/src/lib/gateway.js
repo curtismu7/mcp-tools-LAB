@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { get } from "./api.js";
 
-// State of the simulated gateway (Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; per-caller entitlement UNVERIFIED on our tenant)). It lives in the app shell,
+// State of the simulated gateway (Ping release claim of 2026-11-02 (listing and cap measured on gateway v1.261106; access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant)). It lives in the app shell,
 // not in the page, so one Reset can restore it together with the diagram. The default config always comes from the
 // server (GET /api/gateway/default); nothing here keeps a second copy of it.
 
 export const ALIAS = /^[a-z][a-z0-9-]{0,15}$/;
-export const BANNER = "Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant";
+export const BANNER = "Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant";
 export const LAYER_TEXT = {
   unknown: "no such tool",
   unreachable: "the member server is unreachable",

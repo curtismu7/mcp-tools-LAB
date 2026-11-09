@@ -11,7 +11,7 @@ import {
 } from "../lib/gateway.js";
 import "./Gateway.css";
 
-// Entitled listing and aggregate cap, a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), per-caller entitlement UNVERIFIED on our tenant. Mock: a simulation in
+// Entitled listing and aggregate cap, a Ping release claim (2026-11-02), listing and cap measured on gateway v1.261106 (2026-11-08), access by caller measured per aggregate (2026-11-09), per-tool filtering per caller UNVERIFIED on our tenant. Mock: a simulation in
 // this process; every result comes from the server's /api/gateway routes (the engine), not from text in this file. Real
 // (header toggle): GatewayReal asks a real gateway's aggregate apps. The teaching sections are in GatewayLearn.jsx.
 
