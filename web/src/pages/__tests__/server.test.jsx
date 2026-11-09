@@ -212,6 +212,22 @@ describe("Server page: call", () => {
     expect(sent("POST /api/connections/c1/call")).toHaveLength(0);
   });
 
+  it("the confirm dialog is the shared FloatingDialog (modal, movable title bar) and Escape cancels it", async () => {
+    const user = userEvent.setup();
+    await ready(user);
+    await user.selectOptions(screen.getByLabelText("Tool"), "get_weather");
+    await user.type(screen.getByLabelText(/city/), "Oslo");
+    await user.click(screen.getByRole("button", { name: "Review call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Send this call?" });
+    expect(dialog).toHaveAttribute("data-testid", "confirm-dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(within(dialog).getByTestId("fd-titlebar")).toHaveTextContent("Send this call?");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    fireEvent.keyDown(within(dialog).getByTestId("fd-titlebar"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(sent("POST /api/connections/c1/call")).toHaveLength(0);
+  });
+
   it("a tool with no schema properties takes raw JSON arguments", async () => {
     const user = userEvent.setup();
     await ready(user);
