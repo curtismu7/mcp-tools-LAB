@@ -29,7 +29,7 @@ import { clip, scrub, scrubJson } from './redact.js';
 import { analyze, buildReport, parseSnapshot, SnapshotError } from './scanner/index.js';
 import { collectFromClient } from './scanner/live.js';
 import { LIMITS, RULES } from './scanner/rules.js';
-import { hostCheck, sameOriginWrites } from './security.js';
+import { hostCheck, labProxyHosts, sameOriginWrites } from './security.js';
 import { createStore } from './store.js';
 import { shelfInfo } from './shelfLink.js';
 
@@ -39,6 +39,7 @@ const bad = (res, message, status = 400, error = status === 404 ? 'not_found' : 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
 export function createApp({ env = process.env, store = mockOnly(env) ? createMockStore() : createStore({ dir: dataDir(env) }), health = createHealth({ env }), pingone = pingoneEnabled(env) ? createPingone({ env, port: configPort(env) }) : null, knownServers = listKnownServers } = {}) {
+  const proxyHosts = labProxyHosts(env); // LAB_ALLOWED_HOSTS, parsed before anything else starts
   const mock = mockOnly(env);
   if (mock && store.file !== null) store = createMockStore(); // mock-only never uses a disk store
   const fill = createFill();
@@ -50,7 +51,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   const maxScan = scanMaxBytes(env);
   const app = express();
   app.disable('x-powered-by');
-  app.use(hostCheck(env));
+  app.use(hostCheck(env, proxyHosts));
   app.use((_req, res, next) => {
     res.set({
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
@@ -62,7 +63,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   const api = express.Router();
   const small = express.json({ limit: '256kb' });
   const big = express.json({ limit: maxScan });
-  api.use(sameOriginWrites());
+  api.use(sameOriginWrites(proxyHosts));
   if (mock) api.use(mockGuard());
   api.use('/health', health.router);
   api.use('/gateway', createGatewayRouter({ getMode: () => mode, mockOnly: mock, env })); // Mock: the in-process simulation, no outbound call. Real: gateway/real.js

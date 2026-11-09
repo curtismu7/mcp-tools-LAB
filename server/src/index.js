@@ -4,7 +4,7 @@ import { port as configPort } from './config.js';
 import { allPassed, runChecks } from './doctor.js';
 import { mockOnly } from './mock.js';
 import { loadSharedP1 } from './p1config.js';
-import { assertBindAllowed, bindHost } from './security.js';
+import { assertBindAllowed, bindHost, labProxyHosts } from './security.js';
 
 // Local runs read the repo-root .env (real env vars win).
 if (!mockOnly()) { try { process.loadEnvFile(fileURLToPath(new URL('../../.env', import.meta.url))); } catch { /* no .env */ } } // mock-only reads no host files
@@ -27,6 +27,7 @@ export function startHttpServer({ port = configPort(), host = bindHost(), app = 
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  labProxyHosts(process.env); // a malformed LAB_ALLOWED_HOSTS stops the start before any check, timer or socket
   const checks = runChecks();
   if (!allPassed(checks)) {
     for (const c of checks.filter((x) => x.level === 'fail')) console.error(`[mcp-tools] refusing to start: ${c.id}: ${c.detail}`);
