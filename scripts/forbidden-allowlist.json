@@ -4,6 +4,10 @@
     {
       "host": "placeholder.ping-devops.com",
       "reason": "made-up host in server/test/oauth.test.js proving the OAuth sign-in refuses Ping-hosted authorization servers (rule 16); it is never contacted"
+    },
+    {
+      "host": "mcp-tools.local.ping-devops.com",
+      "reason": "docker-compose.yml LAB_ALLOWED_HOSTS default: the Host name the family lab-proxy sends for this tool (inbound only, never contacted)"
     }
   ],
   "uuids": []

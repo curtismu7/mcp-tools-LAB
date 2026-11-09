@@ -129,7 +129,7 @@ Exit code: 0 clean, 1 a finding at or above `--fail-on` (default `warn`), 2 coul
 This tool connects to servers the operator names, so it is built to be careful. Each rule has a test.
 
 - Binds `127.0.0.1` only. Any other address needs `MCPTOOLS_BIND` (an explicit opt-in).
-- Every request must carry a loopback `Host` header (DNS-rebinding guard); other names need `MCPTOOLS_ALLOWED_HOSTS`.
+- Every request must carry a loopback `Host` header (DNS-rebinding guard); other names need `MCPTOOLS_ALLOWED_HOSTS`, or `LAB_ALLOWED_HOSTS` (comma-separated names, accepted only as `<name>:<PORT>`). Docker defaults `LAB_ALLOWED_HOSTS` to the name the family lab-proxy sends; on that Host only, a write whose Origin equals `X-Forwarded-Proto://X-Forwarded-Host` counts as same-origin. The `/proxy` endpoint for MCP clients keeps its strict Origin rule.
 - Every state-changing call must carry an `Origin` equal to `Host`: same-origin only.
 - Saved connections live in `~/.mcp-tools` (or `DATA_DIR`) in `connections.json`, mode 600, in a mode 700 directory. `npm run doctor` and `/api/health` check the modes.
 - A token is never returned by any API, never logged, never put in a trace or shown in the UI (it shows `set`). If a server echoes it back in an error or a result, it is replaced by `[redacted]`.
