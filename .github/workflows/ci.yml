@@ -68,8 +68,7 @@ jobs:
         run: ./gitleaks detect --source . --redact --no-banner -v
 
   e2e:
-    # Playwright 1.58.2 (locked) cannot install browser deps on the ubuntu-latest (26.04) image.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
