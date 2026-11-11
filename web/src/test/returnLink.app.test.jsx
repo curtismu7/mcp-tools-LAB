@@ -52,3 +52,8 @@ describe("return link", () => {
     expect(returnLinkFor("mcp-tools").href).toBe("http://127.0.0.1:5603/?returned=mcp-tools&uc=UC-LEARN4");
   });
 });
+
+  it("?from=ai-demo-standalone: strip names AI Demo Standalone, Back goes to /ai-demo-standalone/ under the proxy", () => {
+    window.history.replaceState(null, "", "/mcp-tools/?from=ai-demo-standalone&uc=UC12");
+    expect(returnLinkFor("mcp-tools").href).toBe("/ai-demo-standalone/?returned=mcp-tools&uc=UC12");
+  });
