@@ -13,7 +13,8 @@ import Gateway from "./pages/Gateway.jsx";
 import Proxy from "./pages/Proxy.jsx";
 import ReleaseBanner from "./components/ReleaseBanner.jsx";
 import { useGateway } from "./lib/gateway.js";
-import { PresentBar, PresentProvider, PresentToggle } from "./present/PresentMode.jsx";
+import { PresentBar, PresentProvider, usePresent } from "./present/PresentMode.jsx";
+import TopMenu from "./top-menu/TopMenu.jsx";
 
 const PAGES = [["connect", "Connect"], ["server", "Server"], ["proxy", "Live proxy"], ["offline", "Scan a snapshot"], ["gateway", "Entitled listing"], ["stories", "Stories"], ["diagram", "How it fits"], ["limits", "Limits", true]];
 const store = {
@@ -22,6 +23,7 @@ const store = {
 };
 
 function Shell() {
+  const presentCtx = usePresent();
   const [page, setPage] = useState(() => (PAGES.some(([id]) => id === window.location.hash.slice(1)) ? window.location.hash.slice(1) : "connect"));
   const [theme, setTheme] = useState(() => store.read("mcp-tools-theme") || "system");
   const [config, setConfig] = useState(null);
@@ -57,24 +59,27 @@ function Shell() {
       <header className="top">
         <h1>MCP tools</h1>
         <ReturnLink app="mcp-tools" variant="header" />
-        <ShelfLink />
-        <div className="seg" role="group" aria-label="Mock or Real" data-testid="mode-toggle">
-          <button type="button" aria-pressed={modeInfo?.source !== "real"} aria-disabled={modeInfo?.source === "real" || undefined} onClick={() => chooseMode("mock")} data-testid="mode-mock">Mock</button>
-          <button type="button" aria-pressed={modeInfo?.source === "real"} aria-disabled={modeInfo?.realAvailable === false || undefined}
-            title={modeInfo?.realAvailable === false && modeInfo?.realReason ? modeInfo.realReason : undefined}
-            onClick={() => chooseMode("real")} data-testid="mode-real">Real</button>
-        </div>
         <nav aria-label="Pages">
           {PAGES.map(([id, label, admin]) => (
             <a key={id} href={`#${id}`} aria-current={page === id ? "page" : undefined} data-admin-only={admin ? "" : undefined} onClick={(e) => { e.preventDefault(); setPage(id); }}>{label}</a>
           ))}
         </nav>
-        <PresentToggle />
-        <label className="theme">Theme
-          <select value={theme} onChange={(e) => setTheme(e.target.value)}>
-            <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
-          </select>
-        </label>
+        <span className="shell-right">
+          <TopMenu
+            mode={{
+              value: modeInfo?.source === "real" ? "real" : "mock",
+              onChange: chooseMode,
+              realAvailable: modeInfo ? modeInfo.realAvailable !== false : null,
+              realHint: modeInfo?.realAvailable === false ? modeInfo.realReason : undefined,
+            }}
+            theme={{ value: theme === "system" ? "auto" : theme, onChange: (v) => setTheme(v === "auto" ? "system" : v) }}
+            present={{ active: presentCtx?.present, onToggle: () => presentCtx?.set(!presentCtx?.present) }}
+            help={{ href: "https://github.com/curtismu7/mcp-tools-LAB#readme" }}
+            version={modeInfo?.version || null}
+          >
+            <ShelfLink />
+          </TopMenu>
+        </span>
       </header>
       <PresentBar />
       <ReleaseBanner config={config} source={modeInfo?.source || "mock"} />

@@ -8,7 +8,7 @@ import { mockOnly } from './mock.js';
 import { allPassed, needsSetup, runChecks as defaultChecks } from './doctor.js';
 
 const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-const DEMO = { id: 'mcp-tools', name: 'MCP tools', version };
+export const DEMO = { id: 'mcp-tools', name: 'MCP tools', version };
 
 export function createHealth({ runChecks = defaultChecks, env = process.env, now = () => new Date(), intervalMs = 60_000 } = {}) {
   let last = { state: 'unknown', at: null };

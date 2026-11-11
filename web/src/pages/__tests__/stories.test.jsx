@@ -43,7 +43,7 @@ describe("Stories page and presenter mode", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByTestId("story-panel");
-    await user.click(screen.getByRole("button", { name: "Present" }));
+    await user.click(screen.getByTestId("presenter"));
     expect(document.documentElement.dataset.present).toBe("1");
     expect(screen.getByTestId("present-count")).toHaveTextContent("Step 1 of 6");
     await act(async () => { fireEvent.keyDown(window, { key: "ArrowRight" }); });

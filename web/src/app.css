@@ -23,7 +23,7 @@ h4 { margin: 0.5rem 0 0.25rem; font-size: 1rem; }
 a { color: var(--status-info); }
 code { font-size: 0.85rem; overflow-wrap: anywhere; }
 
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); background: var(--surface); }
+.top { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); background: var(--surface); }
 .top nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 20rem; }
 .top nav a { padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text); text-decoration: none; border: 1px solid transparent; }
 .top nav a[aria-current="page"] { border-color: var(--accent); font-weight: 600; }

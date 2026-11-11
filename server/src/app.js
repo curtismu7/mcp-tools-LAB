@@ -95,6 +95,7 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
   // Rule 19: the Mock/Real toggle. The mode is server-side and runtime-switchable. Real (the live inspector)
   // is refused on a MOCK_ONLY=1 hosted copy with 409 and the honest reason; elsewhere it is always available.
   const modeView = () => ({
+    version: (health.DEMO || {}).version || null,
     source: mode === 'real' ? 'real' : 'mock',
     realAvailable: !mock,
     ...(mock ? { realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.' } : { realReason: null }),

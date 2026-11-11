@@ -48,7 +48,7 @@ describe("the release-claim banner", () => {
   it("is still there in presenter mode, on every tab", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Present" }));
+    await user.click(await screen.findByTestId("presenter"));
     expect(document.documentElement.dataset.present).toBe("1");
     for (const name of PAGES) {
       await user.click(screen.getByRole("link", { name }));
@@ -62,7 +62,7 @@ describe("the release-claim banner", () => {
     const user = userEvent.setup();
     render(<App />);
     await waitFor(() => expect(screen.getByTestId("release-banner")).toHaveTextContent(/Mock: the live proxy/));
-    await user.click(screen.getByTestId("mode-real"));
+    await user.selectOptions(screen.getByTestId("mode-select"), "real");
     await waitFor(() => expect(screen.getByTestId("release-banner")).toHaveTextContent(/Real: the live proxy offers your saved servers/));
     expect(screen.getByTestId("release-banner")).not.toHaveTextContent(/Mock:/);
   });
