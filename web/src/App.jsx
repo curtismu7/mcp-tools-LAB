@@ -52,6 +52,16 @@ function Shell() {
 
   const open = (c, go = true) => { setActive(c); if (go) setPage("server"); };
   const clear = (id) => { setScans((s) => { const { [id]: _gone, ...rest } = s; return rest; }); setActive((a) => (a?.id === id ? null : a)); };
+  const [resetNote, setResetNote] = useState("");
+  const reset = useCallback(async () => {
+    try {
+      await post("/api/reset");
+      await gw.reset();
+      setScans({});
+      setActive(null);
+      setResetNote("Reset: saved connections are gone, the simulated gateway is back to its default, this session's scans are cleared.");
+    } catch (e) { setResetNote(`Reset failed: ${e.message}`); }
+  }, [gw]);
 
   return (
     <>
@@ -76,6 +86,7 @@ function Shell() {
             present={{ active: presentCtx?.present, onToggle: () => presentCtx?.set(!presentCtx?.present) }}
             help={{ href: "https://github.com/curtismu7/mcp-tools-LAB#readme" }}
             version={modeInfo?.version || null}
+            onReset={reset}
           >
             <ShelfLink />
           </TopMenu>
@@ -86,6 +97,7 @@ function Shell() {
       <ReturnLink app="mcp-tools" />
       {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
       {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
+      {resetNote && <p className="notice" role="status" data-testid="reset-note">{resetNote}</p>}
       <main className="page" id="main" tabIndex={-1}>
         {page === "connect" && <Connect config={config} activeId={active?.id} onOpen={open} onRemoved={clear} />}
         {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} mockOnly={Boolean(config?.mockOnly)} />}

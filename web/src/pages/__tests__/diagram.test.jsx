@@ -16,7 +16,7 @@ describe("Diagram", () => {
     await act(async () => { fireEvent.click(await screen.findByRole("link", { name: "How it fits" })); });
     expect(screen.getByRole("group", { name: /Boxes can be dragged/ })).toBeInTheDocument();
     expect(screen.getByLabelText("Speed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+    expect(within(screen.getByRole("main")).getByRole("button", { name: "Reset" })).toBeInTheDocument();
     expect(screen.getByTestId("caption")).toHaveTextContent("Press Simulate");
     for (const t of ["MCP server", "Connection", "Scan: JUDGE", "Findings", "Your decision", "tools/call"]) expect(screen.getByText(t)).toBeInTheDocument();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Simulate" })); });
@@ -26,7 +26,7 @@ describe("Diagram", () => {
     await act(async () => { fireEvent.change(screen.getByLabelText("Speed"), { target: { value: "4" } }); });
     await act(async () => { await vi.advanceTimersByTimeAsync(450); });
     expect(screen.getByTestId("caption")).toHaveTextContent(/Step 3 of 6/);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Reset" })); });
+    await act(async () => { fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: "Reset" })); });
     expect(screen.getByTestId("caption")).toHaveTextContent("Press Simulate");
   });
 
