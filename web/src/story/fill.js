@@ -1,7 +1,8 @@
-// Copied from the ID-JAG kit (id-jag-standalone web/src/story/fill.js, MIT), unchanged in behaviour.
+// Copied from the ID-JAG kit (id-jag-standalone web/src/story/fill.js). Unchanged.
 // Story text is written once with tokens; a vertical pack supplies the names and nouns.
-//   {{ada}}           a cast id, replaced by that person's name
-//   {{vocab.server}}  a vocabulary entry of the vertical
+//   {{lena}}          a cast id, replaced by that person's name (the {{cast.*}} family: the id resolves through vertical.cast)
+//   {{vocab.partner}} a vocabulary entry of the vertical
+// A customer persona ({ lena: "Priya" }) overrides a cast name.
 // A token nothing defines stays visible as ⟨missing: token⟩ so a gap is seen, not hidden.
 
 const TOKEN = /\{\{\s*([\w.]+)\s*\}\}/g;
@@ -14,7 +15,7 @@ export function fill(text, vertical, persona) {
   });
 }
 
-/** Every token used anywhere in a value (string, array or object), as "ada" / "vocab.server". */
+/** Every token used anywhere in a value (string, array or object), as "lena" / "vocab.partner". */
 export function tokensIn(value, found = new Set()) {
   if (typeof value === "string") for (const m of value.matchAll(TOKEN)) found.add(m[1]);
   else if (Array.isArray(value)) value.forEach((v) => tokensIn(v, found));
