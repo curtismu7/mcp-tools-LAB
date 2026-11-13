@@ -262,11 +262,11 @@ test('rule 19: GET /api/info has the toggle shape and POST /api/mode switches bo
   await withApp({}, async ({ call }) => {
     const i0 = await call('GET', '/api/info');
     assert.equal(i0.status, 200);
-    assert.deepEqual(i0.json, { source: 'mock', realAvailable: true, realReason: null });
+    assert.deepEqual({ ...i0.json, version: undefined }, { source: 'mock', realAvailable: true, realReason: null, version: undefined });
     const toReal = await call('POST', '/api/mode', { source: 'real' });
     assert.equal(toReal.status, 200);
-    assert.deepEqual(toReal.json, { source: 'real', realAvailable: true, realReason: null });
-    assert.deepEqual((await call('GET', '/api/info')).json, { source: 'real', realAvailable: true, realReason: null });
+    assert.deepEqual({ ...toReal.json, version: undefined }, { source: 'real', realAvailable: true, realReason: null, version: undefined });
+    assert.deepEqual({ ...(await call('GET', '/api/info')).json, version: undefined }, { source: 'real', realAvailable: true, realReason: null, version: undefined });
     const back = await call('POST', '/api/mode', { source: 'mock' });
     assert.equal(back.status, 200);
     assert.equal(back.json.source, 'mock');
@@ -275,8 +275,8 @@ test('rule 19: GET /api/info has the toggle shape and POST /api/mode switches bo
 
 test('rule 19: on a MOCK_ONLY copy Real is refused with 409 and the honest reason, and the mode never changes', T, async () => {
   await withApp({ env: { MOCK_ONLY: '1' } }, async ({ call }) => {
-    assert.deepEqual((await call('GET', '/api/info')).json, {
-      source: 'mock', realAvailable: false,
+    assert.deepEqual({ ...(await call('GET', '/api/info')).json, version: undefined }, {
+      source: 'mock', realAvailable: false, version: undefined,
       realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.',
     });
     const r = await call('POST', '/api/mode', { source: 'real' });
