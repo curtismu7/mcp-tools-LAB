@@ -145,8 +145,8 @@ try {
   await nav('How it fits');
   await page.getByRole('button', { name: 'Simulate' }).click();
   await sleep(1200);
-  await page.getByRole('button', { name: 'Reset' }).click();
-  await page.getByLabel('Theme').selectOption('dark');
+  await page.getByRole('button', { name: 'Reset' }).last().click(); // the diagram's Reset (the TopMenu also has one)
+  await page.getByTestId('theme-select').selectOption('dark');
   await shot('6-diagram-dark');
   check(external.length === 0, `no request left the app origin${external.length ? `: ${external.join(', ')}` : ''}`);
   check(consoleErrors.length === 0, `no console errors${consoleErrors.length ? `: ${consoleErrors.join(' | ')}` : ''}`);
