@@ -194,3 +194,13 @@ Inspector sees, scanner judges (and only reports), the Hostile MCP demo is the a
 ## Where the code came from
 
 Copied (never imported across repos) from the author's AI-DEMO2 `standalone/mcp-inspector` and `standalone/mcp-scanner`, both MIT; each copied file says so in its header comment. Patterns (health contract, doctor, hooks, CI) follow the ID-JAG kit and the SE shelf. Licence: MIT, see [LICENSE](LICENSE) (Copyright (c) 2026 Curtis Muir, carried over from the inspector). An independent community tool, not endorsed by Ping Identity.
+
+---
+
+## Real mode: through the PingOne Privilege gateway
+
+**Privilege objects this lab uses:** MCP door `<app>/mcp` - the lab measures the gateway aggregate apps (`aggregate`, `aggregate-limited`, `aggregate-none`) with per-caller agent keys, showing the entitlement difference
+
+Settings keys: `MCP_TOOLS_GW_URL`, `MCP_TOOLS_GW_APPS`, at least one `MCP_TOOLS_GW_KEY_<NAME>`
+in the shared settings file (`~/Development/.env`, or the file `STANDALONE_ENV` names). The key
+is write-only: it is scrubbed from every message, error and log line.
