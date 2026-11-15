@@ -1,12 +1,15 @@
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "../../App.jsx";
 import WirePanel from "../WirePanel.jsx";
 import { SPEC_URL, WIRE, callWire } from "../../lib/wire.js";
 import { mockServer } from "../../testUtil.js";
+import { setJsonView } from "../JsonPane.jsx";
 
-afterEach(cleanup);
+// These read the exact JSON text of the request and response bodies, so they use the JSON view (Form is the default).
+beforeEach(() => setJsonView("raw"));
+afterEach(() => { cleanup(); setJsonView("form"); });
 
 describe("WirePanel", () => {
   it("renders request, response, the token split in three and a row per claim with a plain note", () => {

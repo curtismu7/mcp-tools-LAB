@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { del, get, post, pretty, put } from "../lib/api.js";
+import { del, get, post, put } from "../lib/api.js";
+import Json from "../components/JsonPane.jsx";
 import { buildBrief, downloadBrief } from "../lib/brief.js";
 import FlagControl from "../components/FlagControl.jsx";
 import OAuthPanel from "../components/OAuthPanel.jsx";
@@ -178,7 +179,7 @@ export default function Server({ conn, scan, onScanned, onMissing, mockOnly = fa
                       <div className="small"><Untrusted text={t.description || ""} spans={spansFor(findings, t.name, "description")} /></div>
                       <details>
                         <summary className="small">Input schema (shown as text)</summary>
-                        <Untrusted block text={pretty(t.inputSchema ?? null)} />
+                        <Json value={t.inputSchema ?? null} label="Input schema" hot={["required", "properties"]} />
                       </details>
                       <div className="flag-row">
                         <button type="button" className={running === t.name ? "btn" : "btn primary"} aria-expanded={running === t.name} aria-label={`${running === t.name ? "Close" : "Run"} ${t.name}`}

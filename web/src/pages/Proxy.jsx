@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { del, get, post, pretty } from "../lib/api.js";
+import { del, get, post } from "../lib/api.js";
+import Json from "../components/JsonPane.jsx";
 import { Untrusted } from "../lib/Untrusted.jsx";
 import "./Proxy.css";
 
@@ -12,11 +13,11 @@ export const clientCommand = (origin, route, token) => `claude mcp add --transpo
 
 function Body({ body }) {
   if (!body || (!body.json && !body.sse && !body.text)) return <p className="muted small">No body.</p>;
-  const text = body.json !== undefined ? pretty(body.json) : body.sse ? pretty(body.sse) : body.text;
+  const value = body.json !== undefined ? body.json : body.sse ? body.sse : body.text;
   return (
     <>
       <p className="muted small">{body.bytes} bytes, ~{body.tokens} tokens{body.sse ? ", server-sent events" : ""}{body.truncated ? ", only the first 64 KB kept" : ""}</p>
-      <div className="proxy__pre"><Untrusted text={text} block /></div>
+      <Json value={value} label="Body" hot={["method", "name", "arguments", "isError"]} />
     </>
   );
 }

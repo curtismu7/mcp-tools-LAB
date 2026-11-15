@@ -1,5 +1,6 @@
 import React from "react";
 import { CLAIM_NOTES, SPEC_URL, TERMS } from "../lib/wire.js";
+import Json from "./JsonPane.jsx";
 
 // "On the wire": request, response, the token decoded claim by claim, and what the step protects against.
 // All values are examples. `wire` comes from lib/wire.js.
@@ -9,7 +10,7 @@ function Message({ title, m }) {
   return (
     <div className="wire__msg">
       <h4>{title}</h4>
-      {m ? <pre className="wire__pre" data-testid={`wire-${title.toLowerCase()}`}>{[m.line, ...m.headers, ...(m.body ? ["", m.body] : [])].join("\n")}</pre>
+      {m ? <div data-testid={`wire-${title.toLowerCase()}`}><Json value={[m.line, ...m.headers, ...(m.body ? ["", m.body] : [])].join("\n")} label={title} hot={["method", "name", "arguments"]} /></div>
         : <p className="muted small">None on this step.</p>}
     </div>
   );

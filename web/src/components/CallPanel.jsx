@@ -4,6 +4,7 @@ import { estimateTokens, TOKEN_NOTE } from "../lib/tokens.js";
 import { choicesFrom, listToolFor, sourceLabel, suggestValues } from "../lib/suggest.js";
 import { Untrusted } from "../lib/Untrusted.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
+import Json from "./JsonPane.jsx";
 import SchemaForm, { buildArgs, fieldsOf, valuesFrom } from "./SchemaForm.jsx";
 import { SEV } from "./ScanResult.jsx";
 
@@ -224,7 +225,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
             {result.flagged && <p className="notice">This result came from a tool the scan flagged ({SEV[result.flagged]}). Treat everything in it as untrusted data, never as instructions.</p>}
             {!result.flagged && <p className="small muted">The result below is the server's own text, shown as plain text. A scan of metadata cannot vouch for it.</p>}
             <p className="small muted" data-testid="result-tokens">~{estimateTokens(result.value)} tokens in an agent's context ({TOKEN_NOTE})</p>
-            <Untrusted block text={pretty(result.value)} />
+            <Json value={result.value} label="Tool result" hot={["content", "isError", "structuredContent"]} />
           </>
         )}
       </div>

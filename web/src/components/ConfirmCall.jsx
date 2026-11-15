@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { post, pretty } from "../lib/api.js";
-import { Untrusted } from "../lib/Untrusted.jsx";
+import { post } from "../lib/api.js";
 import WirePanel from "./WirePanel.jsx";
+import Json from "./JsonPane.jsx";
 import { callWire } from "../lib/wire.js";
 
 // The confirm step. 1) Preview asks the server for the canonical arguments and their hash. 2) The operator reads exactly
@@ -55,7 +55,7 @@ export default function ConfirmCall({ connectionId, kind, name, params, warn }) 
       )}
       {result && (
         <div className="result" role="status" aria-live="polite" data-testid="result">
-          {result.error ? <p className="alert">{result.error}</p> : <Untrusted block text={pretty(result.result)} />}
+          {result.error ? <p className="alert">{result.error}</p> : <Json value={result.result} label="Tool result" hot={["content", "isError", "structuredContent"]} />}
         </div>
       )}
     </div>
