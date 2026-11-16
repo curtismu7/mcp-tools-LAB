@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
+import VerifyMark from "./components/VerifyMark.jsx";
 // Opened from Customer Agent LAB (UC-LEARN3 and UC-LEARN4 route here): strip + header Back only, nothing preselected.
 import ReturnLink from "./return-link/ReturnLink.jsx";
 import { get, post } from "./lib/api.js";
@@ -89,6 +90,7 @@ function Shell() {
             onReset={reset}
           >
             <ShelfLink />
+            <VerifyMark id="mcp-tools" />
           </TopMenu>
         </span>
       </header>
