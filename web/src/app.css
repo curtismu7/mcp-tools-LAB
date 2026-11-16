@@ -13,7 +13,7 @@
   --mark: color-mix(in srgb, var(--status-warn) 30%, var(--surface));
   --mark-text: var(--text);
 }
-.page { max-width: 76rem; margin: 0 auto; padding: 1rem 0; }
+.page { max-width: 1100px; margin: 0 auto; padding: 1rem 0 2rem; }
 h1 { margin: 0; font-size: 1.25rem; }
 h2 { margin: 0.5rem 0 0.25rem; font-size: 1.4rem; }
 h3 { margin: 1.25rem 0 0.5rem; font-size: 1.1rem; }
@@ -23,11 +23,22 @@ h4 { margin: 0.5rem 0 0.25rem; font-size: 1rem; }
 a { color: var(--status-info); }
 code { font-size: 0.85rem; overflow-wrap: anywhere; }
 
-.top { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); background: var(--surface); }
-.top nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 20rem; }
-.top nav a { padding: 0.35rem 0.7rem; border-radius: 6px; color: var(--text); text-decoration: none; border: 1px solid transparent; }
-.top nav a[aria-current="page"] { border-color: var(--accent); font-weight: 600; }
-.theme { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); }
+/* Shell bar (STANDALONE-UI-PATTERNS.md section 1): Core Dark in both themes, Ping Red gradient rule, full-bleed
+   (the -16px cancels the body gutter); wraps at 600px. position: relative anchors the TopMenu sign-in slot. */
+.shell-bar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; margin: 0 -16px; padding: 0.6rem 1.25rem;
+  background: var(--box-dark); color: var(--on-box); border-bottom: 3px solid transparent; border-image: var(--accent-gradient) 1; }
+.shell-bar :focus-visible { outline: 3px solid var(--on-box); outline-offset: 2px; }
+.shell-bar h1 { color: var(--on-box); }
+.shell-brand { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.02em; }
+.shell-logo { display: inline-grid; place-items: center; min-width: 1.9rem; height: 1.9rem; padding: 0 0.25rem; border-radius: 4px; background: var(--accent-gradient); color: var(--on-accent); font: 800 0.7rem var(--font-mono); }
+.shell-badge { padding: 0.1rem 0.55rem; border-radius: 999px; border: 1px solid transparent; background: var(--accent-gradient); color: var(--on-accent); font: 700 0.68rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.shell-badge--real { background: var(--surface-2); color: var(--status-warn); border-color: var(--status-warn); }
+.shell-nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 auto; }
+.shell-nav a, .shell-nav a:visited { padding: 0.3rem 0.75rem; border-radius: 999px; border: 1px solid var(--on-accent-border); color: var(--on-box); text-decoration: none; font-size: 0.85rem; font-weight: 500; white-space: nowrap; }
+.shell-nav a:hover { background: var(--box-grey); }
+.shell-nav a[aria-current="page"] { background: var(--accent-gradient); border-color: transparent; color: var(--on-accent); font-weight: 700; }
+.shell-bar .shell-right { margin-left: auto; } /* TopMenu renders .top-menu.shell-right; its own layout stays */
+@media (max-width: 600px) { .shell-bar { gap: 0.75rem; padding: 0.6rem 1rem; } .shell-nav { order: 3; flex-basis: 100%; } }
 
 .seg { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.5rem; }
 textarea { width: 100%; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 400; }
@@ -74,12 +85,12 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .fbox.dim { opacity: 0.55; }
 .react-flow__edge.edge-on path.react-flow__edge-path { stroke: var(--accent); stroke-width: 3; }
 
-@media (max-width: 40rem) { .page { padding: 0.75rem 0; } }
+@media (max-width: 40rem) { .page { padding: 0.75rem 0 2rem; } }
 
 /* MT1: pages, tabs, verdict, dialog, skip link */
 .skip { position: absolute; left: -999px; top: 0; padding: 0.5rem 1rem; background: var(--surface); color: var(--text); border: 2px solid var(--accent); z-index: 50; }
 .skip:focus { left: 0.5rem; top: 0.5rem; }
-main:focus { outline: none; }
+main:focus:not(:focus-visible) { outline: none; }
 .conn-list li { align-items: center; }
 .conn-name { flex: 1 1 14rem; overflow-wrap: anywhere; }
 .okt { color: var(--ok); } .badt { color: var(--deny); }

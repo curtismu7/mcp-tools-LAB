@@ -137,6 +137,7 @@ export default function CallPanel({ connectionId, tools, scanned, flaggedBy, onS
         <span className="small muted">asks {lt}, {(tools || []).find((t) => t.name === lt)?.annotations?.readOnlyHint === true ? "which the server marks read-only" : "a tool named like a list (the server does not mark it read-only: check it)"}, once</span>
         {choosing === field && (list?.length ? (
           <ul className="pick-choices" data-testid="pick-choices">
+            {/* ui-pattern: allow A1 the button's name is its visible text, the id the server listed, rendered through the Untrusted component the checker cannot read */}
             {list.map((c) => <li key={c.id}><button type="button" className="btn" onClick={() => choose(field, c)}><Untrusted text={c.label || c.id} /> <span className="muted small"><Untrusted text={c.id} /></span></button></li>)}
           </ul>
         ) : <p className="small muted">{lt} returned no ids. Type one in.</p>)}

@@ -67,40 +67,44 @@ function Shell() {
   return (
     <>
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
-      <header className="top">
-        <h1>MCP tools</h1>
-        <ReturnLink app="mcp-tools" variant="header" />
-        <nav aria-label="Pages">
+      <header className="shell-bar">
+        <span className="shell-brand">
+          <span className="shell-logo" aria-hidden="true">MCP</span>
+          <h1>MCP tools</h1>
+          {modeInfo?.source === "real"
+            ? <span className="shell-badge shell-badge--real" data-testid="mode-badge">Real</span>
+            : <span className="shell-badge" data-testid="mode-badge">Mock</span>}
+        </span>
+        <nav className="shell-nav" aria-label="Pages">
           {PAGES.map(([id, label, admin]) => (
             <a key={id} href={`#${id}`} aria-current={page === id ? "page" : undefined} data-admin-only={admin ? "" : undefined} onClick={(e) => { e.preventDefault(); setPage(id); }}>{label}</a>
           ))}
         </nav>
-        <span className="shell-right">
-          <TopMenu
-            mode={{
-              value: modeInfo?.source === "real" ? "real" : "mock",
-              onChange: chooseMode,
-              realAvailable: modeInfo ? modeInfo.realAvailable !== false : null,
-              realHint: modeInfo?.realAvailable === false ? modeInfo.realReason : undefined,
-            }}
-            theme={{ value: theme === "system" ? "auto" : theme, onChange: (v) => setTheme(v === "auto" ? "system" : v) }}
-            present={{ active: presentCtx?.present, onToggle: () => presentCtx?.set(!presentCtx?.present) }}
-            help={{ href: "https://github.com/curtismu7/mcp-tools-LAB#readme" }}
-            version={modeInfo?.version || null}
-            onReset={reset}
-          >
-            <ShelfLink />
-            <VerifyMark id="mcp-tools" />
-          </TopMenu>
-        </span>
+        <TopMenu
+          mode={{
+            value: modeInfo?.source === "real" ? "real" : "mock",
+            onChange: chooseMode,
+            realAvailable: modeInfo ? modeInfo.realAvailable !== false : null,
+            realHint: modeInfo?.realAvailable === false ? modeInfo.realReason : undefined,
+          }}
+          theme={{ value: theme === "system" ? "auto" : theme, onChange: (v) => setTheme(v === "auto" ? "system" : v) }}
+          present={{ active: presentCtx?.present, onToggle: () => presentCtx?.set(!presentCtx?.present) }}
+          help={{ href: "https://github.com/curtismu7/mcp-tools-LAB#readme" }}
+          version={modeInfo?.version || null}
+          onReset={reset}
+        >
+          <ReturnLink app="mcp-tools" variant="header" />
+          <ShelfLink />
+          <VerifyMark id="mcp-tools" />
+        </TopMenu>
       </header>
-      <PresentBar />
-      <ReleaseBanner config={config} source={modeInfo?.source || "mock"} />
-      <ReturnLink app="mcp-tools" />
-      {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
-      {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
-      {resetNote && <p className="notice" role="status" data-testid="reset-note">{resetNote}</p>}
       <main className="page" id="main" tabIndex={-1}>
+        <ReleaseBanner config={config} source={modeInfo?.source || "mock"} />
+        <ReturnLink app="mcp-tools" />
+        {config?.mockOnly && <p className="notice" role="note" data-testid="mock-banner">Hosted, simulated mock: sample data only, nothing leaves this server</p>}
+        {modeNote && <p className="notice" role="status" data-testid="mode-note">{modeNote}</p>}
+        {resetNote && <p className="notice" role="status" data-testid="reset-note">{resetNote}</p>}
+        <PresentBar />
         {page === "connect" && <Connect config={config} activeId={active?.id} onOpen={open} onRemoved={clear} />}
         {page === "server" && <Server key={active?.id || "none"} conn={active} scan={active ? scans[active.id] : null} onScanned={(id, data) => setScans((s) => ({ ...s, [id]: data }))} onMissing={() => active && clear(active.id)} mockOnly={Boolean(config?.mockOnly)} />}
         {page === "proxy" && <Proxy modeSource={modeInfo?.source || "mock"} />}

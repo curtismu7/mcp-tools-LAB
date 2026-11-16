@@ -29,7 +29,8 @@ describe("return link", () => {
     const note = await screen.findByRole("note", NOTE);
     expect(note.textContent).toContain("UC-LEARN3");
     expect(screen.getByTestId("release-banner").nextElementSibling).toBe(note);
-    expect(document.querySelector("header.top > button.return-link--header")).not.toBeNull();
+    expect(document.querySelector("header.shell-bar .shell-right button.return-link--header")).not.toBeNull(); // header Back in the shell bar TopMenu
+    expect(document.querySelector("main#main").firstElementChild).toBe(screen.getByTestId("release-banner")); // shell bar first, then main with the banner first
     expect(screen.getAllByRole("button", { name: /Back to Customer Agent LAB/ })).toHaveLength(2);
   });
 

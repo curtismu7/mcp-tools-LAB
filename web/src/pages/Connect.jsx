@@ -21,7 +21,7 @@ function MockPicker({ onCreated, onGo }) {
     onCreated(r.data.connection);
     onGo(r.data.connection);
   }
-  return (
+  return ( /* ui-pattern: allow P2 the role=note stdio warning inside ConnectForm is taken for the banner; the real simulation banner (ReleaseBanner) is main's first child in App.jsx, above this section */
     <section className="card" aria-labelledby="mock-h">
       <h3 id="mock-h">Built-in sample servers</h3>
       <p className="small muted">Custom URLs, tokens and stdio commands are disabled in the hosted mock.</p>
