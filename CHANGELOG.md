@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added: the shared `VerifyMark` (vendored byte for byte from AI-DEMO-Standalone `shared/verify-mark`, pinned) shows this lab's Verified / In progress mark from the demo shelf in the top menu, beside the Shelf link (shelf id `mcp-tools`; the scanner entry `mcp-scanner` is the same app and is not shown separately). It reads the same `GET /api/shelf` call the Shelf link makes, so it shows through the lab-proxy and nothing when the lab is opened on its own port, when the shelf has no mark for it, or when the shelf is unreachable.
 - Changed: a three-key comparison on gateway `v1.261106` (2026-11-09) showed access differs by caller at the level of a whole aggregate. The banner and docs now say so; per-tool filtering per caller is still UNVERIFIED. Re-vendored `standalone-ui.css` from the family's main.
 - Added: a 401 Bearer challenge on a call made through the live proxy (per-server or one URL) also brings up the OAuth sign-in on the Server page, and a 403 that names missing scopes for a signed-in user now says which scope is missing and what has to be true for it to be requested (`mcp_scope_needed`).
 - Added: a server that answers initialize and tools/list anonymously but refuses `tools/call` (the Banking MCP server) now gets the OAuth sign-in. A 401 Bearer challenge on a call is remembered, the sign-in card appears, and you run the call again after signing in.
