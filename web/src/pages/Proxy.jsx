@@ -104,6 +104,7 @@ export default function Proxy({ modeSource }) {
                   <tr key={f.id} aria-selected={open?.id === f.id} data-testid="flow-row">
                     <td>{time(f.at)}</td>
                     <td><Untrusted text={f.routeLabel} /></td>
+                    {/* ui-pattern: allow A1 the button's name is its visible text, the flow's RPC or HTTP method, rendered through the Untrusted component the checker cannot read */}
                     <td><button type="button" className="btn" onClick={() => show(f.id)}><Untrusted text={f.rpcMethod || f.httpMethod} /></button></td>
                     <td className={f.open ? "muted" : f.status >= 400 || f.error ? "badt" : "okt"}>{f.open ? "open" : f.status}</td>
                     <td>{f.ms ?? ""}</td>
