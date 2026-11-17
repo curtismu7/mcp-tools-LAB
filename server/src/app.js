@@ -100,7 +100,10 @@ export function createApp({ env = process.env, store = mockOnly(env) ? createMoc
     realAvailable: !mock,
     ...(mock ? { realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.' } : { realReason: null }),
   });
-  let mode = 'mock';
+  // Rule 26 (owner, 2026-11-17): the boot mode is sticky. MTB_LAB_MODE=real (case-insensitive) in the
+  // app .env starts in Real when the copy is not mock-only, so a rebuild cannot silently drop the lab
+  // back to Mock. Any other value boots Mock.
+  let mode = !mock && String(env.MTB_LAB_MODE || '').trim().toLowerCase() === 'real' ? 'real' : 'mock';
   // Live proxy (Peek-style flow log). Its control API is under /api/proxy; the proxy itself is /proxy/mcp/<id> (below).
   const liveProxy = createProxy({ store, manager, getMode: () => mode, mockOnly: mock, secretsFor, oauth });
   api.use('/proxy', liveProxy.api);
