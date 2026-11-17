@@ -31,22 +31,22 @@ test('identityFrom reads claims only, ignores a non-JWT, and drops oversized val
 
 test('demoFor matches a connection to our server by URL; an unknown server gets nothing', () => {
   const fill = createFill();
-  const weather = loadKnownServers().find((s) => s.id === 'weather');
-  assert.equal(fill.demoFor({ url: weather.url }).city_name, 'Austin');
-  assert.equal(fill.demoFor({ url: weather.url }).location_name, undefined, 'a saved-location name is not made up');
+  const hostile = loadKnownServers().find((s) => s.id === 'hostile-mcp');
+  assert.equal(fill.demoFor({ url: hostile.url }).city, 'Austin');
+  assert.equal(fill.demoFor({ url: hostile.url }).location_name, undefined, 'a saved-location name is not made up');
   assert.deepEqual(fill.demoFor({ url: 'http://127.0.0.1:1/mcp' }), {});
   assert.deepEqual(fill.demoFor({ transport: 'stdio' }), {});
 });
 
 test('the fill endpoint: demo values for our server, no identity when signed out, nothing on a mock-only copy', T, async () => {
-  const weather = loadKnownServers().find((s) => s.id === 'weather');
+  const hostile = loadKnownServers().find((s) => s.id === 'hostile-mcp');
   const app = await startApp();
   try {
-    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: weather.url, label: 'weather' })).json.connection.id;
+    const id = (await app.call('POST', '/api/connections', { transport: 'http', url: hostile.url, label: 'hostile-mcp' })).json.connection.id;
     const r = await app.call('GET', `/api/connections/${id}/fill`);
     assert.equal(r.status, 200);
     assert.equal(r.headers.get('cache-control'), 'no-store');
-    assert.equal(r.json.demo.city_name, 'Austin');
+    assert.equal(r.json.demo.city, 'Austin');
     assert.equal(r.json.identity, null);
     const other = (await app.call('POST', '/api/connections', { transport: 'http', url: 'http://127.0.0.1:1/mcp' })).json.connection.id;
     assert.deepEqual((await app.call('GET', `/api/connections/${other}/fill`)).json, { demo: {}, identity: null });
