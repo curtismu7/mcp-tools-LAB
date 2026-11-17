@@ -20,8 +20,8 @@ test('the committed list is valid: loopback http servers with a port, unique ids
     assert.ok(u.port, `${s.id} has a port`);
     assert.equal(u.username + u.password, '');
   }
-  for (const id of ['everything', 'hostile-mcp', 'banking-mcp', 'weather', 'opensearch']) assert.ok(list.some((s) => s.id === id), `${id} is listed`);
-  assert.ok(list.filter((s) => s.needsToken).every((s) => s.id === 'jwt-verifier' || s.id === 'mcp-gateway'), 'only the servers that refuse a tokenless request say they need one');
+  for (const id of ['everything', 'hostile-mcp', 'mcp-resource-server', 'opensearch']) assert.ok(list.some((s) => s.id === id), `${id} is listed`);
+  assert.ok(list.every((s) => !s.needsToken), 'every shipped server answers a tokenless request; entries that need one are added by the operator');
 });
 
 test('validation refuses anything that is not a plain loopback http entry', T, () => {
