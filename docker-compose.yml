@@ -15,6 +15,9 @@ services:
       # The browser's Host header is 127.0.0.1:HOST_PORT; the Host check compares names only, so any HOST_PORT works.
       # Names besides loopback the tool answers to (as <name>:4810). The default is the Host the family lab-proxy sends.
       LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-mcp-tools.local.ping-devops.com}
+      # Rule 26 (owner, 2026-11-17): sticky boot mode. MTB_LAB_MODE=real in the .env starts the lab in
+      # Real on boot; a rebuild cannot silently drop it back to Mock. Mock stays the default when unset.
+      MTB_LAB_MODE: ${MTB_LAB_MODE:-mock}
     volumes:
       - mcp-tools-data:/data
     read_only: true

@@ -273,8 +273,24 @@ test('rule 19: GET /api/info has the toggle shape and POST /api/mode switches bo
   });
 });
 
-test('rule 19: on a MOCK_ONLY copy Real is refused with 409 and the honest reason, and the mode never changes', T, async () => {
-  await withApp({ env: { MOCK_ONLY: '1' } }, async ({ call }) => {
+// Rule 26 (owner, 2026-11-17): the boot mode is sticky. MTB_LAB_MODE=real boots Real when the copy is
+// not mock-only; anything else (typo, MOCK_ONLY=1) boots Mock. The env read is the app's createApp env.
+test('rule 26: MTB_LAB_MODE=real boots Real, MTB_LAB_MODE=live does not, MOCK_ONLY always boots Mock', T, async () => {
+  await withApp({ env: { MTB_LAB_MODE: 'real' } }, async ({ call }) => {
+    assert.equal((await call('GET', '/api/info')).json.source, 'real', 'sticky boot: Real without a click');
+    const back = await call('POST', '/api/mode', { source: 'mock' });
+    assert.equal(back.status, 200);
+    assert.equal(back.json.source, 'mock', 'the toggle still switches back at runtime');
+  });
+  await withApp({ env: { MTB_LAB_MODE: 'live' } }, async ({ call }) => {
+    assert.equal((await call('GET', '/api/info')).json.source, 'mock', 'only real (or Real) opts in');
+  });
+  await withApp({ env: { MTB_LAB_MODE: 'real', MOCK_ONLY: '1' } }, async ({ call }) => {
+    assert.equal((await call('GET', '/api/info')).json.source, 'mock', 'a mock-only copy never boots Real');
+  });
+});
+
+test('rule 19: on a MOCK_ONLY copy Real is refused with 409 and the honest reason, and the mode never changes', T, async () => {  await withApp({ env: { MOCK_ONLY: '1' } }, async ({ call }) => {
     assert.deepEqual({ ...(await call('GET', '/api/info')).json, version: undefined }, {
       source: 'mock', realAvailable: false, version: undefined,
       realReason: 'This hosted copy is mock only (MOCK_ONLY=1): every server is an in-process fixture and nothing can connect out, so Real is unavailable.',
