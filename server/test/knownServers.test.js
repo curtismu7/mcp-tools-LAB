@@ -24,6 +24,14 @@ test('the committed list is valid: loopback http servers with a port, unique ids
   assert.ok(list.every((s) => !s.needsToken), 'every shipped server answers a tokenless request; entries that need one are added by the operator');
 });
 
+test('the committed list names no AI-DEMO2 server: none of its ports or names, only family servers', T, () => {
+  const raw = fs.readFileSync(new URL('../data/known-servers.json', import.meta.url), 'utf8');
+  assert.doesNotMatch(raw, /AI-DEMO2|ai-demo2|AI_DEMO2/);
+  const ports = loadKnownServers().map((s) => new URL(s.url).port);
+  for (const p of ['8080', '3036', '9031', '8623', '4000']) assert.ok(!ports.includes(p), `port ${p} is an AI-DEMO2 port, not a standalone default`);
+  assert.equal(loadKnownServers().find((s) => s.id === 'mcp-resource-server').url, 'http://127.0.0.1:8081/mcp', "mcp-resource-server-LAB's published port");
+});
+
 test('validation refuses anything that is not a plain loopback http entry', T, () => {
   assert.throws(() => validateKnownServers(null), /expected/);
   assert.throws(() => validateKnownServers(doc(entry({ url: 'http://10.0.0.5:4730/mcp' }))), /loopback/);

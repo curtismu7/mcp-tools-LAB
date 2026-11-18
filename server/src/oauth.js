@@ -67,7 +67,7 @@ export function parseResourceMap(raw) {
     let url; try { url = new URL(item.slice(0, cut)); } catch { continue; }
     const aud = item.slice(cut + 1);
     if (!/^https?:$/.test(url.protocol) || !aud || aud.length > 200) continue;
-    let host = aud; try { host = new URL(aud).hostname; } catch { /* a bare name such as mcp-invest.ping.demo */ }
+    let host = aud; try { host = new URL(aud).hostname; } catch { /* a bare name such as mcp-invest.example */ }
     if (isPingHost(host) || /pingone|pingfederate/i.test(aud)) continue; // the raw text too: 'api.pingone.com:443' parses as a scheme with no hostname
     map.set(trimSlashes(url.toString()), aud);
   }
