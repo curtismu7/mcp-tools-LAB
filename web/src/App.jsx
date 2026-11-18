@@ -16,6 +16,8 @@ import ReleaseBanner from "./components/ReleaseBanner.jsx";
 import { useGateway } from "./lib/gateway.js";
 import { PresentBar, PresentProvider, usePresent } from "./present/PresentMode.jsx";
 import TopMenu from "./top-menu/TopMenu.jsx";
+import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
+import talkMd from "../../docs/talk-track.md?raw";
 
 const PAGES = [["connect", "Connect"], ["server", "Server"], ["proxy", "Live proxy"], ["offline", "Scan a snapshot"], ["gateway", "Entitled listing"], ["stories", "Stories"], ["diagram", "How it fits"], ["limits", "Limits", true]];
 const store = {
@@ -24,6 +26,15 @@ const store = {
 };
 
 function Shell() {
+  const [talkOpen, setTalkOpen] = useState(false);
+  const talkSteps = (() => {
+    const steps = []; let n = 0;
+    for (const line of talkMd.split("\n")) {
+      const m = line.match(/^\d+\.\s+(?:"(.+?)"|\*\*(.+?)\.\*\*\s*(.*))$/);
+      if (m) { n += 1; steps.push({ id: `s${n}`, title: (m[1] || m[2]).slice(0, 60), say: m[1] || m[3] }); }
+    }
+    return steps.length ? steps : [{ id: "s1", title: "Talk track", say: talkMd.slice(0, 600) }];
+  })();
   const presentCtx = usePresent();
   const [page, setPage] = useState(() => (PAGES.some(([id]) => id === window.location.hash.slice(1)) ? window.location.hash.slice(1) : "connect"));
   const [theme, setTheme] = useState(() => store.read("mcp-tools-theme") || "system");
@@ -89,6 +100,7 @@ function Shell() {
           }}
           theme={{ value: theme === "system" ? "auto" : theme, onChange: (v) => setTheme(v === "auto" ? "system" : v) }}
           present={{ active: presentCtx?.present, onToggle: () => presentCtx?.set(!presentCtx?.present) }}
+          talkTrack={{ active: talkOpen, onToggle: () => setTalkOpen((v) => !v) }}
           help={{ href: "https://github.com/curtismu7/mcp-tools-LAB#readme" }}
           version={modeInfo?.version || null}
           onReset={reset}
@@ -113,6 +125,8 @@ function Shell() {
         {page === "stories" && <Stories />}
         {page === "diagram" && <Diagram theme={theme} onNavigate={setPage} gw={gw} />}
         {page === "limits" && <Limits />}
+      <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={talkSteps} />
+
       </main>
     </>
   );
