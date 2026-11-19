@@ -7,4 +7,5 @@
 .proxy__kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.75rem; font-size: 0.85rem; }
 .proxy__kv dt { color: var(--muted); }
 .proxy__kv dd { margin: 0; word-break: break-all; }
-.proxy__cols { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.proxy__cols { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .proxy__cols { grid-template-columns: minmax(0, 1fr); } }
