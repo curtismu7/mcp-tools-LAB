@@ -426,8 +426,8 @@ test('the mapping never applies to a server that signs in with another authoriza
 });
 
 test('parseResourceMap: URL=audience pairs, last = splits, junk and Ping API audiences are skipped', () => {
-  const m = parseResourceMap('http://127.0.0.1:8081/mcp=mcp-invest.ping.demo, https://srv.example/mcp/=https://aud.example/x https://q.example/mcp?k=v=aud-q  bad  =x nourl=a http://h/=  ftp://f/mcp=aud https://api.pingone.com=https://api.pingone.com http://p/mcp=api.pingone.eu http://q/mcp=my-pingone.example');
-  assert.deepEqual([...m], [['http://127.0.0.1:8081/mcp', 'mcp-invest.ping.demo'], ['https://srv.example/mcp', 'https://aud.example/x'], ['https://q.example/mcp?k=v', 'aud-q']]);
+  const m = parseResourceMap('http://127.0.0.1:8081/mcp=mcp-invest.example, https://srv.example/mcp/=https://aud.example/x https://q.example/mcp?k=v=aud-q  bad  =x nourl=a http://h/=  ftp://f/mcp=aud https://api.pingone.com=https://api.pingone.com http://p/mcp=api.pingone.eu http://q/mcp=my-pingone.example');
+  assert.deepEqual([...m], [['http://127.0.0.1:8081/mcp', 'mcp-invest.example'], ['https://srv.example/mcp', 'https://aud.example/x'], ['https://q.example/mcp?k=v', 'aud-q']]);
   assert.equal(parseResourceMap('http://a/mcp=https://api.pingone.com. http://b/mcp=api.pingone.com. http://c/mcp=api.pingone.com:443 http://d/mcp=urn:x:pingone http://e/mcp=pingone:api http://f/mcp=PINGONE').size, 0, 'Ping API audiences are dropped in every spelling');
   assert.equal(parseResourceMap('').size, 0); assert.equal(parseResourceMap(undefined).size, 0);
   assert.equal(parseResourceMap(`http://h/mcp=${'a'.repeat(201)}`).size, 0, 'an over-long audience is skipped');

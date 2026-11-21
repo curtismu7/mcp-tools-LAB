@@ -53,20 +53,20 @@ describe("Offline scan page", () => {
 
   it("gets the tools/list from one of our servers and fills the box", async () => {
     mockServer({
-      "GET /api/known-servers": () => ({ servers: [{ id: "bank", label: "Banking MCP", url: "http://127.0.0.1:8080/mcp", running: true, needsToken: false, start: "npm start" }] }),
+      "GET /api/known-servers": () => ({ servers: [{ id: "mcp-resource-server", label: "MCP resource server", url: "http://127.0.0.1:8081/mcp", running: true, needsToken: false, start: "npm start" }] }),
       "POST /api/connections": (b) => (b.transport === "mock"
         ? { connection: { id: "c1", label: "Sample", transport: "mock" }, test: { ok: true } }
-        : { connection: { id: "c2", label: "Banking MCP", transport: "http", token: null }, test: { ok: true } }),
+        : { connection: { id: "c2", label: "MCP resource server", transport: "http", token: null }, test: { ok: true } }),
       "GET /api/connections/c2/tools": () => ({ tools: [{ name: "get_balance", description: "Balance", inputSchema: { type: "object", properties: {} } }] }),
     });
     const user = userEvent.setup();
     render(<App />);
     await screen.findByDisplayValue(/get_weather/);
     await user.click(screen.getByRole("button", { name: "One of our servers" }));
-    await user.selectOptions(await screen.findByLabelText("Our servers"), "bank");
+    await user.selectOptions(await screen.findByLabelText("Our servers"), "mcp-resource-server");
     await user.click(screen.getByRole("button", { name: "Get its tools/list" }));
     expect(await screen.findByDisplayValue(/get_balance/)).toBeInTheDocument();
-    expect(sent("POST /api/connections")[1].body).toMatchObject({ transport: "http", url: "http://127.0.0.1:8080/mcp" });
+    expect(sent("POST /api/connections")[1].body).toMatchObject({ transport: "http", url: "http://127.0.0.1:8081/mcp" });
     expect(screen.getByTestId("snap-run")).toHaveTextContent(/the real server/);
   });
 
