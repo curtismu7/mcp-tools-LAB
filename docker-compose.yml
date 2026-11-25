@@ -9,6 +9,11 @@ services:
     build: .
     ports:
       - "127.0.0.1:${HOST_PORT:-4810}:4810"
+    env_file:
+      # The gateway settings (MCP_TOOLS_GW_URL/_APPS/_KEY_*) live in ~/Development/.env (owner-run, never committed).
+      # env_file passes the whole file; the server reads only the MCP_TOOLS_* names from it (gateway/real.js readSettings).
+      - path: ${HOME}/Development/.env
+        required: false
     environment:
       SHELF_URL: ${SHELF_URL:-https://local.ping-devops.com:8443/demo-shelf}
       PORT: "4810"
