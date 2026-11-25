@@ -8,6 +8,10 @@
     {
       "host": "mcp-tools.local.ping-devops.com",
       "reason": "docker-compose.yml LAB_ALLOWED_HOSTS default: the Host name the family lab-proxy sends for this tool (inbound only, never contacted)"
+    },
+    {
+      "host": "local.ping-devops.com",
+      "reason": "docker-compose.yml env_file comment's example path context: the same family lab-proxy host already allowlisted above (inbound only, never contacted); the env_file entry names the owner's local file, not a contacted host"
     }
   ],
   "uuids": []
