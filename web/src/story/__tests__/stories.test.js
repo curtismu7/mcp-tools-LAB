@@ -80,5 +80,32 @@ describe("fill", () => {
     expect(fillAll(src, v)).toEqual({ t: "Ada" });
     expect(src.t).toBe("{{ada}}");
   });
-  it("falls back to generic for an unknown vertical", () => expect(verticalById("nope").id).toBe(DEFAULT_VERTICAL));
+  it("falls back to the default (airlines) for an unknown vertical", () => {
+    expect(DEFAULT_VERTICAL).toBe("airlines");
+    for (const bad of [undefined, null, "", "nope", "__proto__", "Airlines"]) expect(verticalById(bad).id).toBe("airlines");
+  });
+});
+
+describe("AirGuard Airlines, the default story", () => {
+  const air = verticalById(DEFAULT_VERTICAL);
+  const rendered = JSON.stringify(STORIES.map((s) => fillAll(s, air)));
+  it("is the airlines pack and names the airline", () => {
+    expect(air.id).toBe("airlines");
+    expect(air.displayName).toBe("AirGuard Airlines");
+    expect(JSON.stringify(air)).toMatch(/AirGuard Airlines/);
+  });
+  it("uses the A2A lab's cast and no host other than .example", () => {
+    expect(air.cast.ada.name).toBe("Alice");
+    expect(air.cast.sam.name).toBe("Dave");
+    expect(JSON.stringify(air)).not.toMatch(/https?:|@[a-z0-9.-]+\.(com|net|org)/i);
+  });
+  it("every story resolves with no undefined token in the airline run", () => expect(rendered).not.toContain("⟨missing"));
+  it("carries no retired or other-vertical brand or cast name in the airline run", () => {
+    const retired = ["Meridian Air", "Meridian Journeys", "Skyline Air", "Northwind", "Contoso", "Tessera", "Fabrikam", "Harbor", "Vellum", "Mark", "Mary", "Priya", "Tom", "Ada", "Sam"];
+    for (const name of retired) expect(rendered, name).not.toMatch(new RegExp(`\\b${name}\\b`));
+  });
+  it("the older packs still render their own names", () => {
+    expect(JSON.stringify(fillAll(storyById("MT1"), verticalById("banking")))).toMatch(/Priya/);
+    expect(JSON.stringify(fillAll(storyById("MT1"), verticalById("generic")))).toMatch(/\bAda\b/);
+  });
 });

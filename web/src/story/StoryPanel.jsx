@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePresent } from "../present/PresentMode";
-import { STORIES, VERTICALS, storyById, verticalById } from "./stories";
+import { DEFAULT_VERTICAL, STORIES, VERTICALS, storyById, verticalById } from "./stories";
 import { fillAll } from "./fill";
 import "./StoryPanel.css";
 
@@ -14,7 +14,7 @@ const write = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage
 
 export default function StoryPanel() {
   const [storyId, setStoryId] = useState(() => storyById(read(KEYS.story, null)).id);
-  const [verticalId, setVerticalId] = useState(() => read(KEYS.vertical, "generic"));
+  const [verticalId, setVerticalId] = useState(() => read(KEYS.vertical, DEFAULT_VERTICAL));
   const [alt, setAlt] = useState(() => read(KEYS.path, "main") === "alt");
   const [localActive, setLocalActive] = useState(null);
   const presenter = usePresent();
