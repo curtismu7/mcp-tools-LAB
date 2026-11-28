@@ -44,7 +44,7 @@ Open the Entitled listing tab and the diagram. A banner says it on every tab: th
 
 ## Two stories, presenter mode
 
-Open the stories (generic, airlines and banking packs) and presenter mode for a scripted narrative with the ReactFlow diagram — movable boxes, Simulate, Reset, speed. Good for a room that wants the arc told rather than the tabs walked.
+Open the stories (AirGuard Airlines is the default pack; banking and generic are the others) and presenter mode for a scripted narrative with the ReactFlow diagram — movable boxes, Simulate, Reset, speed. Good for a room that wants the arc told rather than the tabs walked.
 
 ## What this tool is not
 

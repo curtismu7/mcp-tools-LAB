@@ -14,15 +14,29 @@ describe("Stories page and presenter mode", () => {
     const user = userEvent.setup();
     render(<App />);
     const panel = await screen.findByTestId("story-panel");
+    expect(panel).toHaveTextContent("Alice scans a vendor's flight-operations MCP server before any agent reads it");
+    expect(panel).toHaveTextContent("AirGuard Airlines");
+    expect(screen.getByLabelText("Vertical")).toHaveValue("airlines");
+    await user.selectOptions(screen.getByLabelText("Vertical"), "generic");
     expect(panel).toHaveTextContent("scans a third-party MCP server before any agent reads it");
     await user.selectOptions(screen.getByLabelText("Vertical"), "banking");
     expect(panel).toHaveTextContent("Priya scans a fintech partner's payments MCP server");
     await user.selectOptions(screen.getByLabelText("Vertical"), "airlines");
-    expect(panel).toHaveTextContent("Mark scans");
+    expect(panel).toHaveTextContent("Alice scans");
     expect(panel).not.toHaveTextContent("⟨missing");
 
     await user.click(screen.getByRole("button", { name: /^6\s*Call only what you chose/ }));
     expect(panel).toHaveTextContent("The confirm dialog shows the exact arguments".replace("dialog shows", "dialog shows")) ;
+  });
+
+  it("a saved banking or generic choice keeps working, and a saved unknown id shows the airline default", async () => {
+    mockServer();
+    for (const [saved, want] of [["banking", "Priya scans"], ["generic", "Ada scans"], ["nope", "Alice scans"]]) {
+      localStorage.setItem("mcptools.story.vertical", saved);
+      const { unmount } = render(<App />);
+      expect(await screen.findByTestId("story-panel")).toHaveTextContent(want);
+      unmount();
+    }
   });
 
   it("switches to the second story and its alternative path", async () => {

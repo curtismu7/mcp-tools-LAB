@@ -6,6 +6,6 @@ const byFile = (mods) => Object.values(mods).map((m) => m.default ?? m);
 export const STORIES = byFile(import.meta.glob("../data/stories/*.json", { eager: true })).sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }));
 export const VERTICALS = byFile(import.meta.glob("../data/verticals/*.json", { eager: true }));
 
-export const DEFAULT_VERTICAL = "generic";
+export const DEFAULT_VERTICAL = "airlines";
 export const verticalById = (id) => VERTICALS.find((v) => v.id === id) || VERTICALS.find((v) => v.id === DEFAULT_VERTICAL);
 export const storyById = (id) => STORIES.find((s) => s.id === id) || STORIES[0];

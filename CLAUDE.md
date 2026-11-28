@@ -19,5 +19,8 @@ Tier: Tester. Connect to an MCP server, list what it offers, scan the metadata f
 - OAuth (`server/src/oauth.js`) is a rule-16 exception for third-party servers only (docs/rule-16-waiver.md): keep the Ping-host refusal and keep tokens in memory only.
 - Review brief (`web/src/lib/brief.js`): server text and notes go only inside `fence()`; never interpolate them into headings or plain lines.
 
+## Story default (fleet change, 2026-11-28)
+- The Stories page defaults to the `airlines` pack: AirGuard Airlines, a fictional airline (Alice Chen, Reservations Engineering, and Dave Okoro, Security; names from the A2A lab's world). `DEFAULT_VERTICAL` in `web/src/story/stories.js` and the StoryPanel fallback are `airlines`; `banking` and `generic` stay selectable, and an unknown id falls back to the default. `web/src/story/__tests__/stories.test.js` guards it, including a retired-names sweep (Meridian Air and the earlier brands). The scanner fixtures (`server/src/mock.js`, `server/src/mock/hostile.json`) stay brand-neutral on purpose.
+
 ## Shelf
 `docs/shelf-entry.json` registers the app (D3 and D4, one app; tag `mcp-server-built`).
